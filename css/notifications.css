@@ -1,0 +1,169 @@
+/* ==========================================================
+   Hamouda ERP — Notifications & Debt Colors
+   ========================================================== */
+
+/* Toast container */
+.notif-container {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 380px;
+  pointer-events: none;
+}
+
+/* Toast */
+.notif {
+  background: white;
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  box-shadow: var(--shadow-lg);
+  border-right: 4px solid var(--grape-600);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: notifSlideIn 0.3s ease-out;
+  pointer-events: auto;
+  font-weight: 500;
+}
+
+.notif.notif-success { border-right-color: var(--success); }
+.notif.notif-warning { border-right-color: var(--warning); }
+.notif.notif-danger  { border-right-color: var(--danger); }
+.notif.notif-info    { border-right-color: var(--info); }
+
+.notif-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.notif-msg {
+  flex: 1;
+  color: var(--gray-800);
+  font-size: 14px;
+}
+
+.notif.fade-out {
+  animation: notifSlideOut 0.3s ease-in forwards;
+}
+
+@keyframes notifSlideIn {
+  from { transform: translateX(-30px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes notifSlideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(-30px); opacity: 0; }
+}
+
+/* ==========================================================
+   Debt Filter Chips
+   ========================================================== */
+.debt-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.debt-filter-chip {
+  padding: 8px 14px;
+  background: white;
+  border: 2px solid var(--gray-200);
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debt-filter-chip:hover {
+  border-color: var(--grape-400);
+  color: var(--grape-700);
+  transform: translateY(-1px);
+}
+
+.debt-filter-chip.active {
+  color: white;
+  border-color: var(--grape-600);
+}
+
+.chip-count {
+  background: rgba(0,0,0,0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.debt-filter-chip.active .chip-count {
+  background: rgba(255,255,255,0.25);
+}
+
+/* Card danger state */
+.card-danger {
+  border-right: 4px solid var(--danger);
+  background: #FEF2F2;
+}
+
+/* ==========================================================
+   ألوان المديونية الست (تحديث)
+   ========================================================== */
+.debt-blue {
+  background: #DBEAFE;
+  color: #1E40AF;
+  border-color: #93C5FD;
+}
+
+.debt-yellow {
+  background: #FEF3C7;
+  color: #92400E;
+  border-color: #FCD34D;
+}
+
+.debt-orange {
+  background: #FED7AA;
+  color: #9A3412;
+  border-color: #FB923C;
+}
+
+.debt-red-light {
+  background: #FEE2E2;
+  color: #991B1B;
+  border-color: #FCA5A5;
+}
+
+.debt-red-dark {
+  background: #DC2626;
+  color: white;
+  border-color: #B91C1C;
+}
+
+.debt-purple-flash {
+  background: #7C3AED;
+  color: white;
+  border-color: #6D28D9;
+  animation: flashPurple 2s ease-in-out infinite;
+}
+
+@keyframes flashPurple {
+  0%, 100% { background: #7C3AED; }
+  50% { background: #4C1D95; }
+}
+
+.debt-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid;
+  white-space: nowrap;
+}

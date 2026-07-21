@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#7C3AED">
+  <title>حموده — نظام إدارة الشركة</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/notifications.css">
+  <link rel="stylesheet" href="css/modules.css">
+  <link rel="stylesheet" href="css/invoice.css">
+  <link rel="stylesheet" href="css/item-card.css">
+  <link rel="stylesheet" href="css/day7.css">
+
+  <!-- ☁️ Firebase SDK - للرفع اللحظي للسحابة -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+</head>
+<body>
+
+  <!-- ========================================================== -->
+  <!-- SPLASH SCREEN — بسيط واحترافي -->
+  <!-- ========================================================== -->
+  <div id="splash" class="screen active">
+    <div class="splash-content">
+      <img src="assets/logo.png" alt="حموده" class="splash-logo">
+      <div class="splash-loader"></div>
+    </div>
+  </div>
+
+  <!-- ========================================================== -->
+  <!-- FIRST-RUN SETUP (أول مرة يفتح البرنامج) -->
+  <!-- ========================================================== -->
+  <div id="firstRunScreen" class="screen">
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="auth-logo-small">
+          <img src="assets/logo.png" alt="حموده" class="auth-logo-img">
+        </div>
+        <h2 class="auth-title">🎉 مرحباً بحضرتك!</h2>
+        <p class="auth-subtitle">أول مرة تفتح البرنامج — نعمل حساب الأدمن (الحاج)</p>
+
+        <div class="form-group">
+          <label>اسم المستخدم</label>
+          <input type="text" id="fr_username" value="admin" placeholder="admin">
+        </div>
+
+        <div class="form-group">
+          <label>كلمة السر (6 حروف على الأقل)</label>
+          <input type="password" id="fr_password" placeholder="••••••">
+          <small class="hint">اختر كلمة سر قوية — دي هتبقى كلمة سر الحاج</small>
+        </div>
+
+        <div class="form-group">
+          <label>تأكيد كلمة السر</label>
+          <input type="password" id="fr_password_confirm" placeholder="••••••">
+        </div>
+
+        <button class="btn btn-primary btn-full" onclick="doFirstRunSetup()">
+          🚀 ابدأ استخدام النظام
+        </button>
+
+        <div id="fr_error" class="error-msg" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================== -->
+  <!-- LOGIN SCREEN -->
+  <!-- ========================================================== -->
+  <div id="loginScreen" class="screen">
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="auth-logo-small">
+          <img src="assets/logo.png" alt="حموده" class="auth-logo-img auth-logo-img-lg">
+        </div>
+        <h2 class="auth-title">تسجيل الدخول</h2>
+        <p class="auth-subtitle">شركة حموده للمنتجات الغذائية</p>
+
+        <div class="form-group">
+          <label>اسم المستخدم</label>
+          <input type="text" id="login_username" placeholder="admin" autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label>كلمة السر</label>
+          <input type="password" id="login_password" placeholder="••••••" autocomplete="current-password">
+        </div>
+
+        <button class="btn btn-primary btn-full" onclick="doLogin()">
+          🔐 دخول
+        </button>
+
+        <div id="login_error" class="error-msg" style="display:none;"></div>
+        <div id="login_locked" class="warning-msg" style="display:none;"></div>
+      </div>
+
+      <div class="auth-footer">
+        <small>Hamouda ERP v3.0 — MG AppHouse</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================== -->
+  <!-- MAIN APP SHELL -->
+  <!-- ========================================================== -->
+  <div id="mainApp" class="screen">
+
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+
+      <div class="nav-brand">
+        <img src="assets/logo-sm.png" alt="حموده" class="nav-logo-img">
+        <span>حموده</span>
+      </div>
+
+      <div class="nav-actions">
+        <button id="installAppBtn" class="icon-btn install-btn" onclick="installApp()" title="تثبيت التطبيق على جهازك">
+          📲
+          <span class="install-btn-text">تثبيت</span>
+        </button>
+        <button id="cloudSyncBtn" class="icon-btn cloud-sync-btn" onclick="CloudSync.fullSync()" title="ارفع البيانات للسحابة الآن">
+          <span class="cloud-icon">☁️</span>
+          <span class="cloud-badge" style="display:none;">0</span>
+        </button>
+        <button id="notifBellBtn" class="icon-btn" style="position:relative;">
+          🔔
+          <span id="notifBadge">0</span>
+        </button>
+        <button class="icon-btn" onclick="showUserMenu()">
+          <span id="userNameShort">👤</span>
+        </button>
+      </div>
+    </nav>
+
+    <div class="app-body">
+
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-user">
+          <div class="user-avatar">👤</div>
+          <div class="user-info">
+            <div class="user-name" id="sidebarUserName">--</div>
+            <div class="user-role" id="sidebarUserRole">--</div>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <button class="nav-item" data-module="dashboard" onclick="switchModule('dashboard')">
+            <span class="nav-icon">🏠</span>
+            <span>الرئيسية</span>
+          </button>
+          <button class="nav-item" data-module="sales" onclick="switchModule('sales')">
+            <span class="nav-icon">💰</span>
+            <span>المبيعات</span>
+          </button>
+          <button class="nav-item" data-module="purchases" onclick="switchModule('purchases')">
+            <span class="nav-icon">🛒</span>
+            <span>المشتريات</span>
+          </button>
+          <button class="nav-item" data-module="inventory" onclick="switchModule('inventory')">
+            <span class="nav-icon">📦</span>
+            <span>المخزون</span>
+          </button>
+          <button class="nav-item" data-module="customers" onclick="switchModule('customers')">
+            <span class="nav-icon">👥</span>
+            <span>العملاء</span>
+          </button>
+          <button class="nav-item" data-module="suppliers" onclick="switchModule('suppliers')">
+            <span class="nav-icon">🏭</span>
+            <span>الموردين</span>
+          </button>
+          <button class="nav-item" data-module="debtors" onclick="switchModule('debtors')">
+            <span class="nav-icon">🔴</span>
+            <span>المدينين</span>
+            <span id="debtorsBadge" class="nav-badge" style="display:none;">0</span>
+          </button>
+          <button class="nav-item" data-module="returns" onclick="switchModule('returns')">
+            <span class="nav-icon">🔄</span>
+            <span>المرتجعات</span>
+          </button>
+          <button class="nav-item" data-module="cloud-pending" onclick="switchModule('cloud-pending')" style="position:relative;">
+            <span class="nav-icon">☁️</span>
+            <span>لم يتم الرفع</span>
+            <span id="pendingSyncBadge" class="nav-badge" style="display:none;">0</span>
+          </button>
+          <button class="nav-item" data-module="products" onclick="switchModule('products')">
+            <span class="nav-icon">🍇</span>
+            <span>الأصناف</span>
+          </button>
+          <button class="nav-item" data-module="warehouses" onclick="switchModule('warehouses')">
+            <span class="nav-icon">🏢</span>
+            <span>المخازن</span>
+          </button>
+          <button class="nav-item" data-module="reports" onclick="switchModule('reports')">
+            <span class="nav-icon">📊</span>
+            <span>التقارير</span>
+          </button>
+
+          <div class="sidebar-divider"></div>
+
+          <button class="nav-item" data-module="users" data-permission="users_view" onclick="switchModule('users')">
+            <span class="nav-icon">👤</span>
+            <span>المستخدمين</span>
+          </button>
+          <button class="nav-item" data-module="permissions" data-permission="settings_permissions" onclick="switchModule('permissions')">
+            <span class="nav-icon">🔐</span>
+            <span>إدارة الصلاحيات</span>
+          </button>
+          <button class="nav-item" data-module="settings" data-permission="settings_company" onclick="switchModule('settings')">
+            <span class="nav-icon">⚙️</span>
+            <span>الإعدادات</span>
+          </button>
+          <button class="nav-item" data-module="activity" data-permission="activity_view" onclick="switchModule('activity')">
+            <span class="nav-icon">📜</span>
+            <span>سجل العمليات</span>
+          </button>
+
+          <div class="sidebar-divider"></div>
+
+          <button class="nav-item nav-logout" onclick="doLogout()">
+            <span class="nav-icon">🚪</span>
+            <span>تسجيل الخروج</span>
+          </button>
+
+          <!-- Developer Credit -->
+          <div class="developer-credit">
+            <div class="dev-label">Designed by</div>
+            <img src="assets/mg-apphouse.png" alt="MG AppHouse" class="dev-logo">
+            <div class="dev-brand">MG APPHOUSE</div>
+            <div class="dev-role">Programmer &amp; Developer</div>
+            <div class="dev-name">Mahmoud Gamal Eldeen</div>
+            <a href="tel:01508613866" class="dev-phone">📞 01508613866</a>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main content -->
+      <main class="main-content" id="mainContent">
+        <!-- كل module بيتحمل هنا ديناميك -->
+        <div id="moduleContainer">
+          <div class="empty-state">
+            <div class="empty-icon">📊</div>
+            <h3>مرحباً بحضرتك في Hamouda ERP</h3>
+            <p>جاري تحميل النظام...</p>
+          </div>
+        </div>
+      </main>
+
+    </div>
+
+    <!-- Notification container -->
+    <div id="notifContainer" class="notif-container"></div>
+  </div>
+
+  <!-- ========================================================== -->
+  <!-- Scripts (بالترتيب مهم) -->
+  <!-- ========================================================== -->
+
+  <!-- Core -->
+  <script src="js/core/firebase-config.js"></script>
+  <script src="js/core/default-data.js"></script>
+  <script src="js/core/utils.js"></script>
+  <script src="js/core/storage.js"></script>
+  <script src="js/core/cloud-sync.js"></script>
+  <script src="js/core/auth.js"></script>
+  <script src="js/core/permissions.js"></script>
+
+  <!-- Shared Engine (قلب النظام) -->
+  <script src="js/shared/transactions.js"></script>
+  <script src="js/shared/item-helper.js"></script>
+
+  <!-- Modules -->
+  <script src="js/modules/dashboard.js"></script>
+  <script src="js/modules/warehouses.js"></script>
+  <script src="js/modules/products.js"></script>
+  <script src="js/modules/inventory.js"></script>
+  <script src="js/modules/suppliers.js"></script>
+  <script src="js/modules/purchases.js"></script>
+  <script src="js/modules/customers.js"></script>
+  <script src="js/modules/sales.js"></script>
+  <script src="js/modules/debtors.js"></script>
+  <script src="js/modules/returns.js"></script>
+  <script src="js/modules/users.js"></script>
+  <script src="js/modules/permissions.js"></script>
+  <script src="js/modules/settings.js"></script>
+  <script src="js/modules/reports.js"></script>
+  <script src="js/modules/activity.js"></script>
+  <script src="js/modules/notifications.js"></script>
+  <script src="js/modules/bulk-payment.js"></script>
+  <script src="js/modules/cloud-pending.js"></script>
+
+  <!-- App entry -->
+  <script src="js/app.js"></script>
+
+</body>
+</html>

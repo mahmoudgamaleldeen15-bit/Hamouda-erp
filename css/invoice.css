@@ -1,0 +1,255 @@
+/* ==========================================================
+   Invoice Styles + Item Rows + Print
+   ========================================================== */
+
+/* ========================================================== */
+/* ITEM ROWS (في form الفاتورة) */
+/* ========================================================== */
+.item-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  background: var(--gray-50);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  border: 1px solid var(--gray-200);
+}
+
+.item-row input,
+.item-row select {
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.item-num {
+  width: 28px;
+  height: 28px;
+  background: var(--grape-100);
+  color: var(--grape-800);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+/* ========================================================== */
+/* INVOICE PRINT VIEW */
+/* ========================================================== */
+.invoice-print {
+  background: white;
+  padding: 32px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.invoice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 20px;
+  border-bottom: 3px double var(--grape-600);
+  margin-bottom: 24px;
+}
+
+.invoice-brand {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.invoice-logo {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+
+.invoice-company {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--grape-800);
+  margin-bottom: 4px;
+}
+
+.invoice-phone {
+  color: var(--gray-600);
+  font-size: 14px;
+}
+
+.invoice-number-box {
+  text-align: left;
+  padding: 12px 20px;
+  background: var(--grape-50);
+  border-radius: var(--radius);
+  border-right: 4px solid var(--grape-600);
+}
+
+.invoice-label {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-bottom: 4px;
+}
+
+.invoice-number {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--grape-800);
+  letter-spacing: 1px;
+}
+
+.invoice-date {
+  font-size: 13px;
+  color: var(--gray-600);
+  margin-top: 4px;
+}
+
+/* Meta */
+.invoice-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+  padding: 16px;
+  background: var(--gray-50);
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.invoice-meta strong {
+  color: var(--gray-700);
+}
+
+/* Items table */
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 24px;
+}
+
+.invoice-table th {
+  background: var(--grape-600);
+  color: white;
+  padding: 10px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.invoice-table th:first-child {
+  border-radius: 0 var(--radius) 0 0;
+}
+
+.invoice-table th:last-child {
+  border-radius: var(--radius) 0 0 0;
+}
+
+.invoice-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--gray-200);
+  font-size: 14px;
+}
+
+.invoice-table tbody tr:nth-child(even) {
+  background: var(--gray-50);
+}
+
+/* Totals */
+.invoice-totals {
+  margin-right: auto;
+  width: 320px;
+  padding: 16px 20px;
+  background: var(--gray-50);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+
+.invoice-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 14px;
+}
+
+.invoice-total-row.invoice-grand {
+  border-top: 2px solid var(--gray-300);
+  margin-top: 6px;
+  padding-top: 12px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--grape-800);
+}
+
+.invoice-notes {
+  padding: 12px 16px;
+  background: #FEF3C7;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 13px;
+  border-right: 4px solid var(--gold-500);
+}
+
+.invoice-footer {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid var(--gray-200);
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+/* ========================================================== */
+/* PRINT STYLES */
+/* ========================================================== */
+@media print {
+  body * { visibility: hidden; }
+
+  .invoice-print, .invoice-print * { visibility: visible; }
+
+  .invoice-print {
+    position: absolute;
+    top: 0; right: 0; left: 0;
+    box-shadow: none;
+    padding: 20px;
+    max-width: 100%;
+  }
+
+  .no-print { display: none !important; }
+
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+}
+
+/* ========================================================== */
+/* RESPONSIVE INVOICE */
+/* ========================================================== */
+@media (max-width: 768px) {
+  .invoice-print { padding: 20px; }
+
+  .invoice-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .invoice-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-totals {
+    width: 100%;
+  }
+
+  .item-row {
+    flex-wrap: wrap;
+  }
+
+  .item-row > div {
+    flex: 1 1 45% !important;
+  }
+}

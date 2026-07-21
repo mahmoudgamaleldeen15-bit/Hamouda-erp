@@ -1,0 +1,322 @@
+/* ==========================================================
+   Hamouda ERP — Components
+   ========================================================== */
+
+/* ========================================================== */
+/* BUTTONS */
+/* ========================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s;
+  border: none;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  background: var(--grape-600);
+  color: white;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.btn-primary:hover {
+  background: var(--grape-700);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.4);
+}
+
+.btn-secondary {
+  background: var(--leaf-600);
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: var(--leaf-700);
+}
+
+.btn-gold {
+  background: var(--gold-600);
+  color: white;
+}
+
+.btn-gold:hover {
+  background: var(--gold-700);
+}
+
+.btn-outline {
+  background: white;
+  color: var(--grape-700);
+  border: 1.5px solid var(--grape-300);
+}
+
+.btn-outline:hover {
+  background: var(--grape-50);
+  border-color: var(--grape-600);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #DC2626;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--gray-700);
+}
+
+.btn-ghost:hover {
+  background: var(--gray-100);
+}
+
+.btn-full {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.btn-lg {
+  padding: 14px 28px;
+  font-size: 16px;
+}
+
+/* ========================================================== */
+/* CARDS */
+/* ========================================================== */
+.card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--gray-100);
+  transition: box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: var(--shadow);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-800);
+}
+
+.card-subtitle {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-top: 2px;
+}
+
+/* Stat card */
+.stat-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--gray-100);
+  border-right: 4px solid var(--grape-600);
+  transition: all 0.2s;
+}
+
+.stat-card:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.stat-card.stat-green { border-right-color: var(--leaf-600); }
+.stat-card.stat-gold { border-right-color: var(--gold-600); }
+.stat-card.stat-red { border-right-color: var(--danger); }
+.stat-card.stat-blue { border-right-color: var(--info); }
+
+.stat-label {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-bottom: var(--space-2);
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--gray-900);
+}
+
+.stat-currency {
+  font-size: 14px;
+  color: var(--gray-500);
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.stat-change {
+  font-size: 13px;
+  margin-top: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-change.positive { color: var(--leaf-600); }
+.stat-change.negative { color: var(--danger); }
+
+/* Grid layouts */
+.grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+@media (max-width: 768px) {
+  .grid-4, .grid-3 { grid-template-columns: repeat(2, 1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+}
+
+/* ========================================================== */
+/* TABLES */
+/* ========================================================== */
+.table-container {
+  background: white;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--gray-100);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  background: var(--gray-50);
+  padding: 12px var(--space-4);
+  text-align: right;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--gray-600);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+td {
+  padding: 14px var(--space-4);
+  border-bottom: 1px solid var(--gray-100);
+  color: var(--gray-800);
+}
+
+tr:hover td {
+  background: var(--gray-50);
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* ========================================================== */
+/* Page header */
+/* ========================================================== */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--gray-100);
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--gray-900);
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: var(--gray-500);
+  margin-top: 2px;
+}
+
+.page-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Under construction placeholder */
+.under-construction {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: var(--space-12);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.uc-icon {
+  font-size: 80px;
+  margin-bottom: var(--space-4);
+}
+
+.uc-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--gray-700);
+  margin-bottom: var(--space-2);
+}
+
+.uc-text {
+  color: var(--gray-500);
+  margin-bottom: var(--space-4);
+}
+
+.uc-day {
+  display: inline-block;
+  background: var(--grape-100);
+  color: var(--grape-800);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 13px;
+}

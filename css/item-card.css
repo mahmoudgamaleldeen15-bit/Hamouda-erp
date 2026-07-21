@@ -1,0 +1,156 @@
+/* ==========================================================
+   Invoice Item Card (Cartons / Weight)
+   ========================================================== */
+
+.invoice-item-card {
+  background: white;
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: border-color 0.2s;
+}
+
+.invoice-item-card:hover {
+  border-color: var(--grape-300);
+}
+
+.item-card-header {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+
+.item-card-header .item-num {
+  width: 32px;
+  height: 32px;
+  background: var(--grape-100);
+  color: var(--grape-800);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 22px;
+}
+
+.item-card-header label {
+  display: block;
+  font-size: 12px;
+  color: var(--gray-600);
+  margin-bottom: 4px;
+}
+
+/* ========================================================== */
+/* Unit Type Toggle */
+/* ========================================================== */
+.unit-type-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 4px;
+  background: var(--gray-100);
+  border-radius: var(--radius);
+}
+
+.unit-type-option {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--gray-600);
+  user-select: none;
+}
+
+.unit-type-option:hover {
+  background: white;
+  color: var(--gray-800);
+}
+
+.unit-type-option.selected {
+  background: white;
+  color: var(--grape-700);
+  box-shadow: var(--shadow-sm);
+}
+
+.unit-type-option input[type="radio"] {
+  display: none;
+}
+
+/* ========================================================== */
+/* Unit Fields */
+/* ========================================================== */
+.unit-fields {
+  padding: 12px;
+  background: var(--gray-50);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+}
+
+.unit-fields label {
+  display: block;
+  font-size: 12px;
+  color: var(--gray-600);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.unit-fields input,
+.unit-fields select {
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.cartons-fields {
+  background: linear-gradient(135deg, #F5F3FF, #FAFAFA);
+  border-right: 3px solid var(--grape-500);
+}
+
+.weight-fields {
+  background: linear-gradient(135deg, #ECFDF5, #FAFAFA);
+  border-right: 3px solid var(--leaf-500);
+}
+
+/* ========================================================== */
+/* Item Totals */
+/* ========================================================== */
+.item-totals {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  margin-top: 10px;
+  background: var(--grape-50);
+  border-radius: var(--radius);
+  border-top: 2px solid var(--grape-200);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .invoice-item-card {
+    padding: 12px;
+  }
+
+  .item-card-header {
+    flex-wrap: wrap;
+  }
+
+  .unit-type-toggle {
+    flex-direction: column;
+  }
+
+  .item-totals {
+    flex-direction: column;
+    gap: 6px;
+    text-align: center;
+  }
+}
