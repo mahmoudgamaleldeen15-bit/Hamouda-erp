@@ -202,10 +202,36 @@ window.addEventListener('load', () => {
     }
   }, 500);
 
-  setTimeout(() => {
+  // ⭐ NEW: فحص ذكي - لو LocalStorage فاضي، حاول تجيب من Firebase الأول
+  setTimeout(async () => {
     if (isFirstRun()) {
-      // أول مرة يفتح - نروح لشاشة الإعداد
-      showScreen('firstRunScreen');
+      // اعرض رسالة "بيتم فحص السحابة"
+      const splashEl = document.getElementById('splash');
+      if (splashEl) {
+        const msg = document.createElement('div');
+        msg.id = 'cloudCheckMsg';
+        msg.style.cssText = 'position:absolute; bottom:80px; left:0; right:0; text-align:center; color:white; font-size:14px; opacity:0.9;';
+        msg.innerHTML = '☁️ جاري فحص السحابة...';
+        splashEl.appendChild(msg);
+      }
+
+      // LocalStorage فاضي - جرب تجيب من السحابة
+      const hasCloudData = await checkCloudForExistingSetup();
+
+      // شيل الرسالة
+      document.getElementById('cloudCheckMsg')?.remove();
+
+      if (hasCloudData) {
+        // ✅ فيه بيانات على السحابة - نزلها وروح للـ Login
+        showNotif('✅ تم تحميل البيانات من السحابة', 'success', 3000);
+        showScreen('loginScreen');
+        setTimeout(() => {
+          document.getElementById('login_username')?.focus();
+        }, 300);
+      } else {
+        // مافيش بيانات لا محلياً ولا سحابياً - إعداد جديد
+        showScreen('firstRunScreen');
+      }
     } else {
       // العادي - Login
       showScreen('loginScreen');
@@ -213,6 +239,70 @@ window.addEventListener('load', () => {
     }
   }, 1500);
 });
+
+// ==========================================================
+// ☁️ فحص السحابة قبل الإعداد الأولى
+// ==========================================================
+async function checkCloudForExistingSetup() {
+  try {
+    // انتظر Cloud Sync يجهز
+    if (typeof CloudSync === 'undefined' || !CloudSync.isInitialized) {
+      // ننتظر شوية للـ init
+      await new Promise(r => setTimeout(r, 1500));
+    }
+
+    if (!CloudSync.isInitialized || !CloudSync.db) {
+      console.log('Cloud not ready, treating as first run');
+      return false;
+    }
+
+    if (!CloudSync.isOnline) {
+      console.log('Offline, treating as first run');
+      return false;
+    }
+
+    console.log('🔍 Checking cloud for existing users...');
+
+    // اقرأ المستخدمين من السحابة
+    const usersSnap = await CloudSync.db.ref('users').once('value');
+    const cloudUsers = usersSnap.val();
+
+    if (!cloudUsers || Object.keys(cloudUsers).length === 0) {
+      console.log('No users found in cloud - fresh install');
+      return false;
+    }
+
+    console.log('✅ Found users in cloud - downloading data...');
+
+    // فيه بيانات - نزل كل حاجة مهمة
+    const pathsToDownload = [
+      'users', 'settings/company', 'settings/payment_methods',
+      'settings/permissions', 'settings/system', 'settings/whatsapp_templates',
+      'settings/units', 'settings/categories', 'settings/cloud_sync',
+      'warehouses', 'products', 'customers', 'suppliers',
+      'sales_invoices', 'purchase_invoices', 'inventory_txns',
+      'payments', 'sales_returns', 'purchase_returns', 'counters'
+    ];
+
+    for (const path of pathsToDownload) {
+      try {
+        const snap = await CloudSync.db.ref(path).once('value');
+        const data = snap.val();
+        if (data) {
+          LocalStore.set(path, data, true); // skipSync = true (مش عاوز يرفع تاني)
+        }
+      } catch (e) {
+        console.warn(`Failed to download ${path}:`, e);
+      }
+    }
+
+    console.log('✅ Cloud data downloaded successfully');
+    return true;
+  } catch (e) {
+    console.error('❌ Cloud check failed:', e);
+    return false;
+  }
+}
 
 // ==========================================================
 // Handle Enter key on login/first-run
