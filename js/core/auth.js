@@ -182,16 +182,33 @@ function enterApp() {
   // Start session timer
   startSessionTimer();
 
-  // ☁️ Trigger cloud sync after login
-  if (typeof CloudSync !== 'undefined' && CloudSync.isInitialized) {
-    const settings = CloudSync.getSettings();
-    if (settings.sync_on_startup) {
-      setTimeout(() => {
-        CloudSync.fullSync(true).catch(e => console.warn('Post-login sync warning:', e));
-      }, 1500);
-    }
+  // ☁️ Trigger cloud sync after login - دائماً بدون شرط
+  if (typeof CloudSync !== 'undefined') {
+    // Force sync after 2 seconds
+    setTimeout(async () => {
+      // Wait for cloud init if not ready
+      let attempts = 0;
+      while (!CloudSync.isInitialized && attempts < 10) {
+        await new Promise(r => setTimeout(r, 500));
+        attempts++;
+      }
+
+      if (CloudSync.isInitialized) {
+        console.log('☁️ Auto-sync after login...');
+        try {
+          await CloudSync.fullSync(true);
+          // بعد الـ sync، refresh الشاشة الحالية عشان تظهر أي بيانات جديدة
+          if (typeof currentModule !== 'undefined' && currentModule && MODULES[currentModule]) {
+            MODULES[currentModule].render();
+          }
+        } catch (e) {
+          console.warn('Post-login sync warning:', e);
+        }
+      }
+    }, 2000);
+
     // Update UI
-    setTimeout(() => CloudSync.updateUI(), 100);
+    setTimeout(() => CloudSync.updateUI && CloudSync.updateUI(), 100);
   }
 }
 

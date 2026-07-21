@@ -21,21 +21,52 @@ function genID(prefix = '') {
 // نظام: {TYPE}-{YEAR}-{USER_CODE}-{SERIAL}
 // مثال: PUR-2026-H-000001 (فاتورة شراء - الحاج - رقم 1)
 //       SAL-2026-M-000042 (فاتورة بيع - المحاسب - رقم 42)
+//
+// ⭐ ذكي: يفحص كل الفواتير الموجودة محلياً + Firebase
+//         ويجيب أعلى رقم +1 - عشان مفيش تعارض بين الأجهزة
 // ==========================================================
 function generateInvoiceNumber(type) {
-  // Type: 'PUR' | 'SAL' | 'RET-S' | 'RET-P' | 'PAY'
   const year = new Date().getFullYear();
 
   // احصل على كود المستخدم الحالي
-  let userCode = 'X'; // fallback
+  let userCode = 'X';
   if (typeof currentUser !== 'undefined' && currentUser) {
     userCode = (currentUser.user_code || 'X').toUpperCase();
   }
 
-  // احصل على counter لهذا المستخدم لهذا النوع
-  const counters = LocalStore.get('counters') || {};
   const counterKey = `${type}_${userCode}`;
-  const serial = counters[counterKey] || 1;
+
+  // 🔍 نتاكد إن الرقم مش مستخدم قبل كده
+  // نفحص كل الفواتير من كل الأنواع الممكنة
+  const searchPrefix = `${type}-${year}-${userCode}-`;
+  let maxSerialUsed = 0;
+
+  // اجمع الفواتير من كل المصادر
+  const allInvoiceSources = [
+    'sales_invoices',
+    'purchase_invoices',
+    'sales_returns',
+    'purchase_returns'
+  ];
+
+  allInvoiceSources.forEach(source => {
+    const invoices = LocalStore.get(source) || {};
+    Object.values(invoices).forEach(inv => {
+      const invNum = inv.invoice_number || inv.return_number || '';
+      if (invNum.startsWith(searchPrefix)) {
+        const serialPart = invNum.substring(searchPrefix.length);
+        const serial = parseInt(serialPart, 10);
+        if (!isNaN(serial) && serial > maxSerialUsed) {
+          maxSerialUsed = serial;
+        }
+      }
+    });
+  });
+
+  // الرقم الجديد = أعلى رقم موجود + 1
+  const counters = LocalStore.get('counters') || {};
+  const counterValue = counters[counterKey] || 0;
+  const serial = Math.max(maxSerialUsed + 1, counterValue + 1, 1);
 
   // Format
   const number = `${type}-${year}-${userCode}-${String(serial).padStart(6, '0')}`;

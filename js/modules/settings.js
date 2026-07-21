@@ -1927,9 +1927,7 @@ ${styles}
     LocalStore.set('inventory_cache', inventory);
 
     // Reset counters - المسح بيبدأ من صفر مع النظام الجديد
-    // كل مستخدم عنده counter منفصل (PUR_H, SAL_M, etc)
     LocalStore.set('counters', {});
-    // Reset cloud sync state
     LocalStore.set('_cloud_pending', []);
     if (typeof CloudSync !== 'undefined') {
       CloudSync.pendingUploads = [];
@@ -1951,6 +1949,22 @@ ${styles}
     });
     LocalStore.set('suppliers', suppliers);
 
+    // ☁️ مسح الفواتير من Firebase كمان
+    if (typeof CloudSync !== 'undefined' && CloudSync.isInitialized && CloudSync.isOnline && CloudSync.db) {
+      const cloudPathsToClear = [
+        'sales_invoices', 'purchase_invoices',
+        'inventory_txns', 'payments',
+        'sales_returns', 'purchase_returns',
+        'counters'
+      ];
+
+      Promise.all(cloudPathsToClear.map(path =>
+        CloudSync.db.ref(path).set(null).catch(e => console.warn(`Failed to clear ${path}:`, e))
+      )).then(() => {
+        console.log('✅ Cloud invoices cleared');
+      });
+    }
+
     logActivity('delete_all_invoices', 'danger', 'delete', 'مسح كل الفواتير', stats);
     showNotif(`✅ تم مسح ${stats.sales + stats.purchases} فاتورة و ${stats.transactions} حركة و ${stats.payments} دفعة`, 'success', 5000);
 
@@ -1964,22 +1978,50 @@ ${styles}
     const companyName = LocalStore.get('settings/company')?.name || 'الشركة';
     this.showPasswordConfirmModal({
       title: '💣 إعادة تعيين المصنع',
-      description: `هيتم مسح كل بيانات النظام (${companyName}) بما فيها الأصناف والعملاء والموردين والمستخدمين، والرجوع لصفحة التثبيت من الصفر.`,
+      description: `⚠️ هيتم مسح كل بيانات النظام (${companyName}) بما فيها الأصناف والعملاء والموردين والمستخدمين، والرجوع لصفحة التثبيت من الصفر.\n\n☁️ هيتم المسح من السحابة كمان (من كل الأجهزة)!`,
       confirmWord: 'امسح كل شيء',
       severity: 'danger',
       onConfirm: () => this._performFactoryReset()
     });
   },
 
-  _performFactoryReset() {
+  async _performFactoryReset() {
+    showNotif('⏳ جاري المسح الشامل...', 'info', 5000);
+
+    // ☁️ مسح من السحابة أولاً (لو متصل)
+    let cloudCleared = false;
+    if (typeof CloudSync !== 'undefined' && CloudSync.isInitialized && CloudSync.isOnline && CloudSync.db) {
+      try {
+        // امسح كل شيء من Firebase (root)
+        await CloudSync.db.ref('/').set(null);
+        cloudCleared = true;
+        console.log('✅ Firebase data cleared');
+      } catch(e) {
+        console.error('Firebase clear failed:', e);
+        // نكمل حتى لو فشل مسح السحابة
+      }
+    }
+
+    // 🗑️ مسح البيانات المحلية
     try {
       const keys = Object.keys(localStorage).filter(k => k.startsWith('hamouda_'));
       keys.forEach(k => localStorage.removeItem(k));
+
+      // امسح pending queue من CloudSync
+      if (typeof CloudSync !== 'undefined') {
+        CloudSync.pendingUploads = [];
+      }
     } catch(e) {
-      console.error('Factory reset failed:', e);
+      console.error('Local reset failed:', e);
       return showNotif('❌ فشل الحذف: ' + e.message, 'danger');
     }
-    showNotif('✅ تم مسح كل البيانات - سيتم إعادة تشغيل النظام', 'success');
-    setTimeout(() => location.reload(), 2000);
+
+    if (cloudCleared) {
+      showNotif('✅ تم المسح من الجهاز والسحابة - جاري إعادة التشغيل', 'success', 3000);
+    } else {
+      showNotif('✅ تم المسح المحلي (السحابة مش متصلة) - جاري إعادة التشغيل', 'warning', 3000);
+    }
+
+    setTimeout(() => location.reload(), 2500);
   }
 };

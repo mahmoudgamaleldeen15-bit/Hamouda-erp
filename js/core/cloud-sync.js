@@ -71,6 +71,10 @@ const CloudSync = {
       // Start auto sync
       this.startAutoSync();
 
+      // ⭐ Real-time listeners على المسارات المهمة
+      // بيخبرنا فوراً لو حصل تغيير من جهاز تاني
+      this.setupRealtimeListeners();
+
       // Sync on startup لو مطلوب
       const settings = this.getSettings();
       if (settings.sync_on_startup) {
@@ -117,6 +121,101 @@ const CloudSync = {
 
   restartAutoSync() {
     this.startAutoSync();
+  },
+
+  // ==========================================================
+  // ⭐ Real-time Listeners - يخبرنا فوراً لما جهاز تاني يعدل
+  // ==========================================================
+  setupRealtimeListeners() {
+    if (!this.db) return;
+
+    // المسارات اللي محتاجين real-time لها
+    const realtimePaths = [
+      'sales_invoices',
+      'purchase_invoices',
+      'payments',
+      'sales_returns',
+      'purchase_returns',
+      'inventory_txns',
+      'customers',
+      'suppliers',
+      'products',
+      'warehouses',
+      'users',
+      'counters'
+    ];
+
+    realtimePaths.forEach(path => {
+      // نستنى شوية قبل ما نبدأ الـ listener عشان مايتفعلش عند التحميل الأولي
+      setTimeout(() => {
+        this.db.ref(path).on('child_added', (snap) => {
+          this.handleRemoteChange(path, snap.key, snap.val(), 'added');
+        });
+
+        this.db.ref(path).on('child_changed', (snap) => {
+          this.handleRemoteChange(path, snap.key, snap.val(), 'changed');
+        });
+
+        this.db.ref(path).on('child_removed', (snap) => {
+          this.handleRemoteRemoval(path, snap.key);
+        });
+      }, 3000); // 3 ثواني بعد الـ init
+    });
+  },
+
+  handleRemoteChange(path, key, data, type) {
+    if (!key || !data) return;
+
+    // اقرأ البيانات المحلية
+    const localData = LocalStore.get(path) || {};
+    const localItem = localData[key];
+
+    // لو مش موجود محلياً - أضفه
+    if (!localItem) {
+      localData[key] = data;
+      LocalStore.set(path, localData, true); // skipSync = true
+      this.notifyChange(path, type, data);
+      this.refreshCurrentPage();
+      return;
+    }
+
+    // مقارنة timestamps
+    const remoteTime = data._synced_at || data.updated_at || data.created_at || 0;
+    const localTime = localItem._synced_at || localItem.updated_at || localItem.created_at || 0;
+
+    // Remote أحدث - حدّث محلياً
+    if (remoteTime > localTime) {
+      localData[key] = data;
+      LocalStore.set(path, localData, true); // skipSync = true
+      this.notifyChange(path, type, data);
+      this.refreshCurrentPage();
+    }
+  },
+
+  handleRemoteRemoval(path, key) {
+    const localData = LocalStore.get(path) || {};
+    if (localData[key]) {
+      delete localData[key];
+      LocalStore.set(path, localData, true);
+      this.refreshCurrentPage();
+    }
+  },
+
+  notifyChange(path, type, data) {
+    // إشعار خفيف فقط للتحديثات المهمة
+    const importantPaths = {
+      'sales_invoices': '💰 فاتورة بيع',
+      'purchase_invoices': '🛒 فاتورة شراء',
+      'payments': '💵 دفعة',
+      'sales_returns': '🔄 مرتجع بيع',
+      'purchase_returns': '🔄 مرتجع شراء'
+    };
+
+    if (importantPaths[path] && type === 'added') {
+      const label = importantPaths[path];
+      const number = data.invoice_number || data.return_number || '';
+      console.log(`☁️ ${label} جديدة: ${number}`);
+    }
   },
 
   // ==========================================================
