@@ -129,6 +129,38 @@ const CloudSync = {
   setupRealtimeListeners() {
     if (!this.db) return;
 
+    // ⭐ Listener خاص للـ Factory Reset
+    this.db.ref('_factory_reset_marker').on('value', (snap) => {
+      const marker = snap.val();
+      if (!marker || !marker.reset_at) return;
+
+      // احصل على آخر reset time اللي شفناه
+      const lastKnownReset = LocalStore.get('_last_seen_reset') || 0;
+
+      // لو الـ marker أحدث من آخر واحد شفناه → يبقى فيه reset حصل
+      if (marker.reset_at > lastKnownReset) {
+        console.log('⚠️ Factory reset detected from another device!');
+
+        // احفظ إن شفناه (عشان مايترددش)
+        LocalStore.set('_last_seen_reset', marker.reset_at, true);
+
+        // امسح كل البيانات المحلية بعد ثانية
+        setTimeout(() => {
+          try {
+            const resetByName = marker.reset_by_name || 'مستخدم آخر';
+            alert(`⚠️ تم عمل ضبط مصنع من جهاز آخر بواسطة: ${resetByName}\n\nسيتم مسح البيانات وإعادة التشغيل.`);
+
+            const keys = Object.keys(localStorage).filter(k => k.startsWith('hamouda_'));
+            keys.forEach(k => localStorage.removeItem(k));
+
+            location.reload();
+          } catch(e) {
+            console.error('Auto-reset failed:', e);
+          }
+        }, 500);
+      }
+    });
+
     // المسارات اللي محتاجين real-time لها
     const realtimePaths = [
       'sales_invoices',

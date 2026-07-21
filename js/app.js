@@ -202,43 +202,102 @@ window.addEventListener('load', () => {
     }
   }, 500);
 
-  // ⭐ NEW: فحص ذكي - لو LocalStorage فاضي، حاول تجيب من Firebase الأول
+  // ⭐ NEW: فحص ذكي في كل الحالات
   setTimeout(async () => {
-    if (isFirstRun()) {
-      // اعرض رسالة "بيتم فحص السحابة"
-      const splashEl = document.getElementById('splash');
-      if (splashEl) {
-        const msg = document.createElement('div');
-        msg.id = 'cloudCheckMsg';
-        msg.style.cssText = 'position:absolute; bottom:80px; left:0; right:0; text-align:center; color:white; font-size:14px; opacity:0.9;';
-        msg.innerHTML = '☁️ جاري فحص السحابة...';
-        splashEl.appendChild(msg);
-      }
+    // اعرض رسالة "بيتم فحص السحابة"
+    const splashEl = document.getElementById('splash');
+    if (splashEl && !document.getElementById('cloudCheckMsg')) {
+      const msg = document.createElement('div');
+      msg.id = 'cloudCheckMsg';
+      msg.style.cssText = 'position:absolute; bottom:80px; left:0; right:0; text-align:center; color:white; font-size:14px; opacity:0.9;';
+      msg.innerHTML = '☁️ جاري فحص السحابة...';
+      splashEl.appendChild(msg);
+    }
 
+    if (isFirstRun()) {
       // LocalStorage فاضي - جرب تجيب من السحابة
       const hasCloudData = await checkCloudForExistingSetup();
 
-      // شيل الرسالة
       document.getElementById('cloudCheckMsg')?.remove();
 
       if (hasCloudData) {
-        // ✅ فيه بيانات على السحابة - نزلها وروح للـ Login
         showNotif('✅ تم تحميل البيانات من السحابة', 'success', 3000);
         showScreen('loginScreen');
         setTimeout(() => {
           document.getElementById('login_username')?.focus();
         }, 300);
       } else {
-        // مافيش بيانات لا محلياً ولا سحابياً - إعداد جديد
         showScreen('firstRunScreen');
       }
     } else {
+      // ⭐ LocalStorage فيه بيانات - نتاكد إن الفكتوري ريست حصل من جهاز تاني
+      const cloudWasReset = await checkIfCloudWasReset();
+
+      document.getElementById('cloudCheckMsg')?.remove();
+
+      if (cloudWasReset) {
+        // السحابة فاضية → يبقى فيه جهاز تاني عمل ضبط مصنع
+        console.log('⚠️ Cloud was reset from another device - clearing local data');
+
+        // امسح كل البيانات المحلية
+        try {
+          const keys = Object.keys(localStorage).filter(k => k.startsWith('hamouda_'));
+          keys.forEach(k => localStorage.removeItem(k));
+        } catch(e) {
+          console.error('Local clear failed:', e);
+        }
+
+        // اعرض رسالة توضيحية للمستخدم
+        showNotif('⚠️ تم مسح البيانات من جهاز آخر - جاري إعادة التشغيل', 'warning', 3000);
+
+        setTimeout(() => location.reload(), 2000);
+        return;
+      }
+
       // العادي - Login
       showScreen('loginScreen');
       document.getElementById('login_username').focus();
     }
   }, 1500);
 });
+
+// ==========================================================
+// ☁️ فحص هل السحابة اتمسحت من جهاز تاني؟
+// ==========================================================
+async function checkIfCloudWasReset() {
+  try {
+    // انتظر Cloud Sync يجهز
+    let attempts = 0;
+    while ((typeof CloudSync === 'undefined' || !CloudSync.isInitialized) && attempts < 10) {
+      await new Promise(r => setTimeout(r, 500));
+      attempts++;
+    }
+
+    if (!CloudSync.isInitialized || !CloudSync.db) {
+      console.log('Cloud not ready - skip reset check');
+      return false;
+    }
+
+    if (!CloudSync.isOnline) {
+      console.log('Offline - skip reset check');
+      return false;
+    }
+
+    // اقرأ users من السحابة
+    const usersSnap = await CloudSync.db.ref('users').once('value');
+    const cloudUsers = usersSnap.val();
+
+    // لو مافيش users في السحابة → يبقى اتمسح كل شيء من جهاز تاني
+    if (!cloudUsers || Object.keys(cloudUsers).length === 0) {
+      return true;
+    }
+
+    return false;
+  } catch (e) {
+    console.error('Cloud reset check failed:', e);
+    return false;
+  }
+}
 
 // ==========================================================
 // ☁️ فحص السحابة قبل الإعداد الأولى

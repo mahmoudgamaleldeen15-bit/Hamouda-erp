@@ -1992,13 +1992,24 @@ ${styles}
     let cloudCleared = false;
     if (typeof CloudSync !== 'undefined' && CloudSync.isInitialized && CloudSync.isOnline && CloudSync.db) {
       try {
-        // امسح كل شيء من Firebase (root)
+        // ⭐ حط علامة factory_reset الأول قبل المسح
+        // ده هيوصل للأجهزة التانية عن طريق real-time listener
+        const resetMarker = {
+          reset_at: Date.now(),
+          reset_by: currentUser?._id || 'unknown',
+          reset_by_name: currentUser?.name || 'مجهول'
+        };
+        await CloudSync.db.ref('_factory_reset_marker').set(resetMarker);
+
+        // استنى شوية عشان الأجهزة التانية تستقبل الإشعار
+        await new Promise(r => setTimeout(r, 1000));
+
+        // ثم امسح كل شيء
         await CloudSync.db.ref('/').set(null);
         cloudCleared = true;
         console.log('✅ Firebase data cleared');
       } catch(e) {
         console.error('Firebase clear failed:', e);
-        // نكمل حتى لو فشل مسح السحابة
       }
     }
 
@@ -2007,7 +2018,6 @@ ${styles}
       const keys = Object.keys(localStorage).filter(k => k.startsWith('hamouda_'));
       keys.forEach(k => localStorage.removeItem(k));
 
-      // امسح pending queue من CloudSync
       if (typeof CloudSync !== 'undefined') {
         CloudSync.pendingUploads = [];
       }
