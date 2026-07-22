@@ -720,6 +720,12 @@ const SalesModule = {
       remaining: remaining,
       total_profit: total_profit,
       payment_method: paid > 0 ? payment_method : 'none',
+      // ✅ بيانات الشيك
+      cheque_number: (paid > 0 && payment_method === 'cheque') ? (document.getElementById('sal_cheque_number')?.value.trim() || '') : '',
+      cheque_recipient: (paid > 0 && payment_method === 'cheque') ? (document.getElementById('sal_cheque_recipient')?.value.trim() || '') : '',
+      cheque_due_date: (paid > 0 && payment_method === 'cheque') ? (document.getElementById('sal_cheque_due_date')?.value || '') : '',
+      // ✅ مرجع التحويل البنكي
+      bank_reference: (paid > 0 && payment_method === 'bank_account') ? (document.getElementById('sal_payment_ref')?.value.trim() || '') : '',
       status: status,
       cancelled_at: 0,
       cancelled_by: '',
@@ -973,7 +979,7 @@ const SalesModule = {
                   <span>${fmtMoney(net.netTotal)} ج.م</span>
                 </div>
                 <div class="invoice-total-row">
-                  <span>المدفوع (${PurchasesModule.getPaymentMethodLabel(inv.payment_method)}):</span>
+                  <span>المدفوع (${PurchasesModule.getPaymentFullDescription(inv)}):</span>
                   <span>${fmtMoney(net.paid)} ج.م</span>
                 </div>
                 <div class="invoice-total-row" style="color:${net.remaining > 0 ? 'var(--danger)' : 'var(--leaf-600)'};">
@@ -988,7 +994,7 @@ const SalesModule = {
                 <span>${fmtMoney(inv.grand_total)} ج.م</span>
               </div>
               <div class="invoice-total-row">
-                <span>المدفوع (${PurchasesModule.getPaymentMethodLabel(inv.payment_method)}):</span>
+                <span>المدفوع (${PurchasesModule.getPaymentFullDescription(inv)}):</span>
                 <span>${fmtMoney(inv.paid)} ج.م</span>
               </div>
               <div class="invoice-total-row" style="color:${inv.remaining > 0 ? 'var(--danger)' : 'var(--leaf-600)'};">
@@ -1189,11 +1195,11 @@ ${(() => {
     return `💰 الإجمالي الأصلي: ${fmtMoney(_n.originalTotal)} ج.م
 🔄 مرتجعات (${_n.returnsCount}): -${fmtMoney(_n.totalReturned)} ج.م
 💎 الصافي: *${fmtMoney(_n.netTotal)} ج.م*
-✅ المدفوع: ${fmtMoney(_n.paid)} ج.م (${PurchasesModule.getPaymentMethodLabel(inv.payment_method)})
+✅ المدفوع: ${fmtMoney(_n.paid)} ج.م (${PurchasesModule.getPaymentFullDescription(inv)})
 🔴 المتبقي: *${fmtMoney(_n.remaining)} ج.م*`;
   }
   return `💰 الإجمالي: *${fmtMoney(inv.grand_total)} ج.م*
-✅ المدفوع: ${fmtMoney(inv.paid)} ج.م (${PurchasesModule.getPaymentMethodLabel(inv.payment_method)})
+✅ المدفوع: ${fmtMoney(inv.paid)} ج.م (${PurchasesModule.getPaymentFullDescription(inv)})
 🔴 المتبقي: *${fmtMoney(inv.remaining)} ج.م*`;
 })()}
 ${inv.due_date ? '📅 استحقاق: ' + inv.due_date : ''}
@@ -1298,7 +1304,6 @@ ${inv.notes ? '\n📝 ملاحظات: ' + inv.notes : ''}`;
     const box = document.getElementById('sal_payment_details_box');
     if (!box) return;
 
-    // إخفاء للكاش والآجل
     if (!methodKey || methodKey === 'cash' || methodKey === 'none') {
       box.style.display = 'none';
       box.innerHTML = '';
@@ -1312,12 +1317,20 @@ ${inv.notes ? '\n📝 ملاحظات: ' + inv.notes : ''}`;
       return;
     }
 
-    if (!method.phone || !method.recipient_name) {
+    const isBank = method.is_bank;
+    const isCheque = method.is_cheque;
+
+    let isConfigured;
+    if (isBank) isConfigured = method.bank_name && method.account_number && method.recipient_name;
+    else if (isCheque) isConfigured = method.recipient_name;
+    else isConfigured = method.phone && method.recipient_name;
+
+    if (!isConfigured) {
       box.style.display = 'block';
       box.innerHTML = `
         <div style="padding:12px; background:#FEF3C7; border:1px solid #F59E0B; border-radius:var(--radius); margin-top:8px; font-size:13px;">
           ⚠️ <strong>${method.label} ما اتضبطش:</strong>
-          محتاج تحدد رقم التحويل واسم المسؤول من
+          محتاج تحدد البيانات من
           <a href="#" onclick="switchModule('settings'); setTimeout(() => SettingsModule.switchTab('payment'), 100); return false;" style="color:var(--grape-700); font-weight:700;">الإعدادات → طرق الدفع</a>
         </div>
       `;
@@ -1325,6 +1338,65 @@ ${inv.notes ? '\n📝 ملاحظات: ' + inv.notes : ''}`;
     }
 
     box.style.display = 'block';
+
+    // 🏛️ حساب بنكي
+    if (isBank) {
+      box.innerHTML = `
+        <div style="padding:14px; background:#F0FDF4; border:1px solid var(--leaf-400); border-radius:var(--radius); margin-top:8px;">
+          <div style="font-weight:700; color:var(--leaf-700); font-size:14px; margin-bottom:8px;">
+            💳 بيانات التحويل البنكي
+          </div>
+          <div style="display:grid; gap:6px; font-size:14px;">
+            <div><span style="color:var(--gray-600);">🏛️ البنك:</span> <strong style="margin-right:8px;">${method.bank_name}</strong></div>
+            <div>
+              <span style="color:var(--gray-600);">🔢 الحساب:</span>
+              <strong style="direction:ltr; display:inline-block; font-size:16px; margin-right:8px; color:var(--grape-700);">${method.account_number}</strong>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${method.account_number}'); showNotif('✅ اتنسخ الرقم','success')">📋</button>
+            </div>
+            <div><span style="color:var(--gray-600);">👤 المستفيد:</span> <strong style="margin-right:8px;">${method.recipient_name}</strong></div>
+            ${method.notes ? `<div style="padding:8px; background:white; border-radius:var(--radius); margin-top:4px;">📝 ${method.notes}</div>` : ''}
+          </div>
+          <div class="form-group" style="margin-top:12px; margin-bottom:0;">
+            <label>📌 مرجع التحويل (اختياري)</label>
+            <input type="text" id="sal_payment_ref" placeholder="رقم مرجع التحويل البنكي"
+                   style="width:100%; padding:8px 12px; border:1px solid var(--gray-300); border-radius:6px;">
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // 📄 شيك
+    if (isCheque) {
+      box.innerHTML = `
+        <div style="padding:14px; background:#FEF3C7; border:1px solid #F59E0B; border-radius:var(--radius); margin-top:8px;">
+          <div style="font-weight:700; color:#92400E; font-size:14px; margin-bottom:8px;">
+            📄 بيانات الشيك
+          </div>
+          <div style="display:grid; gap:10px; font-size:14px;">
+            <div class="form-group" style="margin:0;">
+              <label>🔢 رقم الشيك *</label>
+              <input type="text" id="sal_cheque_number" placeholder="رقم الشيك"
+                     style="width:100%; padding:10px 12px; border:1px solid var(--gray-300); border-radius:6px; font-size:15px;">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>👤 اسم المستفيد</label>
+              <input type="text" id="sal_cheque_recipient" value="${method.recipient_name || ''}" placeholder="اسم المستفيد"
+                     style="width:100%; padding:10px 12px; border:1px solid var(--gray-300); border-radius:6px; font-size:15px;">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>📅 تاريخ استحقاق الشيك (اختياري)</label>
+              <input type="date" id="sal_cheque_due_date"
+                     style="width:100%; padding:10px 12px; border:1px solid var(--gray-300); border-radius:6px; font-size:15px;">
+            </div>
+            ${method.notes ? `<div style="padding:8px; background:white; border-radius:var(--radius); font-size:13px;">📝 ${method.notes}</div>` : ''}
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // 🏦 المحافظ الإلكترونية
     box.innerHTML = `
       <div style="padding:14px; background:#F0FDF4; border:1px solid var(--leaf-400); border-radius:var(--radius); margin-top:8px;">
         <div style="font-weight:700; color:var(--leaf-700); font-size:14px; margin-bottom:8px;">
@@ -1340,11 +1412,7 @@ ${inv.notes ? '\n📝 ملاحظات: ' + inv.notes : ''}`;
             <span style="color:var(--gray-600);">👤 باسم:</span>
             <strong style="margin-right:8px;">${method.recipient_name}</strong>
           </div>
-          ${method.notes ? `
-            <div style="padding:8px; background:white; border-radius:var(--radius); margin-top:4px;">
-              📝 ${method.notes}
-            </div>
-          ` : ''}
+          ${method.notes ? `<div style="padding:8px; background:white; border-radius:var(--radius); margin-top:4px;">📝 ${method.notes}</div>` : ''}
         </div>
       </div>
     `;

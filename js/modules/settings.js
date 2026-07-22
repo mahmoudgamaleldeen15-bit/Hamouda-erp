@@ -243,7 +243,14 @@ const SettingsModule = {
   renderPaymentMethodCard(key, method) {
     const isCash = key === 'cash';
     const hasDetails = method.requires_transfer;
-    const isConfigured = !hasDetails || (method.phone && method.recipient_name);
+    const isBank = method.is_bank;
+    const isCheque = method.is_cheque;
+
+    let isConfigured;
+    if (!hasDetails) isConfigured = true;
+    else if (isBank) isConfigured = method.account_number && method.recipient_name;
+    else if (isCheque) isConfigured = method.recipient_name;
+    else isConfigured = method.phone && method.recipient_name;
 
     return `
       <div class="payment-method-card ${method.enabled ? 'enabled' : ''}" style="flex-direction:column; align-items:stretch;">
@@ -254,7 +261,7 @@ const SettingsModule = {
             <div style="font-weight:800; font-size:17px;">${method.label}</div>
             <div style="font-size:13px; color:var(--gray-500);">
               ${isCash ? 'مقبوض في اليد - لا يحتاج تفاصيل تحويل' :
-                method.enabled ? (isConfigured ? '✅ جاهز' : '⚠️ محتاج تحدد رقم التحويل') : 'غير مفعّل'}
+                method.enabled ? (isConfigured ? '✅ جاهز' : '⚠️ محتاج تكمل البيانات') : 'غير مفعّل'}
             </div>
           </div>
 
@@ -265,47 +272,129 @@ const SettingsModule = {
           </label>
         </div>
 
-        <!-- Transfer Details (visible only for enabled + requires_transfer) -->
-        ${method.enabled && hasDetails ? `
-          <div class="grid grid-2" style="gap:12px;">
-            <div class="form-group" style="margin:0;">
-              <label>📱 رقم التحويل *</label>
-              <input type="tel" id="pm_${key}_phone" value="${method.phone || ''}"
-                     placeholder="01xxxxxxxxx"
-                     oninput="SettingsModule.updatePaymentField('${key}', 'phone', this.value)">
-              <small class="hint">الرقم اللي العميل يحول عليه</small>
-            </div>
-
-            <div class="form-group" style="margin:0;">
-              <label>👤 اسم المسؤول *</label>
-              <input type="text" id="pm_${key}_recipient" value="${method.recipient_name || ''}"
-                     placeholder="مثل: الحاج حموده"
-                     oninput="SettingsModule.updatePaymentField('${key}', 'recipient_name', this.value)">
-              <small class="hint">الاسم اللي هيظهر للعميل عشان يتأكد</small>
-            </div>
-          </div>
-
-          <div class="form-group" style="margin:12px 0 0 0;">
-            <label>📝 ملاحظات إضافية (اختياري)</label>
-            <input type="text" id="pm_${key}_notes" value="${method.notes || ''}"
-                   placeholder="مثل: أرسل صورة السند بعد التحويل"
-                   oninput="SettingsModule.updatePaymentField('${key}', 'notes', this.value)">
-          </div>
-
-          <!-- Preview -->
-          ${isConfigured ? `
-            <div style="margin-top:12px; padding:10px 12px; background:#F0FDF4; border:1px solid var(--leaf-400); border-radius:var(--radius); font-size:13px;">
-              <div style="font-weight:700; color:var(--leaf-700); margin-bottom:4px;">👁️ معاينة اللي هيظهر للعميل:</div>
-              <div style="background:white; padding:8px 12px; border-radius:var(--radius); margin-top:6px;">
-                ${method.icon} <strong>${method.label}</strong><br>
-                📱 حول على: <strong style="direction:ltr; display:inline-block;">${method.phone}</strong><br>
-                👤 باسم: <strong>${method.recipient_name}</strong>
-                ${method.notes ? `<br>📝 ${method.notes}` : ''}
-              </div>
-            </div>
-          ` : ''}
-        ` : ''}
+        <!-- Transfer Details -->
+        ${method.enabled && hasDetails ? this._renderPaymentFields(key, method, isBank, isCheque) : ''}
       </div>
+    `;
+  },
+
+  _renderPaymentFields(key, method, isBank, isCheque) {
+    if (isBank) {
+      // 🏛️ حساب بنكي
+      return `
+        <div class="grid grid-2" style="gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label>🏛️ اسم البنك *</label>
+            <input type="text" id="pm_${key}_bank" value="${method.bank_name || ''}"
+                   placeholder="مثل: البنك الأهلي"
+                   oninput="SettingsModule.updatePaymentField('${key}', 'bank_name', this.value)">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>🔢 رقم الحساب *</label>
+            <input type="text" id="pm_${key}_account" value="${method.account_number || ''}"
+                   placeholder="رقم الحساب أو IBAN"
+                   oninput="SettingsModule.updatePaymentField('${key}', 'account_number', this.value)">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin:12px 0 0 0;">
+          <label>👤 اسم المستفيد *</label>
+          <input type="text" id="pm_${key}_recipient" value="${method.recipient_name || ''}"
+                 placeholder="مثل: شركة حموده للمنتجات الغذائية"
+                 oninput="SettingsModule.updatePaymentField('${key}', 'recipient_name', this.value)">
+          <small class="hint">الاسم اللي التحويل هيتم لصالحه</small>
+        </div>
+
+        <div class="form-group" style="margin:12px 0 0 0;">
+          <label>📝 ملاحظات إضافية (اختياري)</label>
+          <input type="text" id="pm_${key}_notes" value="${method.notes || ''}"
+                 placeholder="مثل: أرسل صورة الإيصال بعد التحويل"
+                 oninput="SettingsModule.updatePaymentField('${key}', 'notes', this.value)">
+        </div>
+
+        ${method.bank_name && method.account_number && method.recipient_name ? `
+          <div style="margin-top:12px; padding:10px 12px; background:#F0FDF4; border:1px solid var(--leaf-400); border-radius:var(--radius); font-size:13px;">
+            <div style="font-weight:700; color:var(--leaf-700); margin-bottom:4px;">👁️ معاينة اللي هيظهر:</div>
+            <div style="background:white; padding:8px 12px; border-radius:var(--radius); margin-top:6px;">
+              ${method.icon} <strong>${method.label}</strong><br>
+              🏛️ البنك: <strong>${method.bank_name}</strong><br>
+              🔢 الحساب: <strong style="direction:ltr; display:inline-block;">${method.account_number}</strong><br>
+              👤 المستفيد: <strong>${method.recipient_name}</strong>
+              ${method.notes ? `<br>📝 ${method.notes}` : ''}
+            </div>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    if (isCheque) {
+      // 📄 شيك
+      return `
+        <div class="form-group" style="margin:0;">
+          <label>👤 اسم المستفيد الافتراضي *</label>
+          <input type="text" id="pm_${key}_recipient" value="${method.recipient_name || ''}"
+                 placeholder="مثل: شركة حموده للمنتجات الغذائية"
+                 oninput="SettingsModule.updatePaymentField('${key}', 'recipient_name', this.value)">
+          <small class="hint">الاسم اللي بيحرر باسمه الشيك - رقم الشيك بيتضاف مع كل فاتورة</small>
+        </div>
+
+        <div class="form-group" style="margin:12px 0 0 0;">
+          <label>📝 ملاحظات إضافية (اختياري)</label>
+          <input type="text" id="pm_${key}_notes" value="${method.notes || ''}"
+                 placeholder="مثل: يتم صرف الشيك بعد أسبوع من التسليم"
+                 oninput="SettingsModule.updatePaymentField('${key}', 'notes', this.value)">
+        </div>
+
+        ${method.recipient_name ? `
+          <div style="margin-top:12px; padding:10px 12px; background:#F0FDF4; border:1px solid var(--leaf-400); border-radius:var(--radius); font-size:13px;">
+            <div style="font-weight:700; color:var(--leaf-700); margin-bottom:4px;">👁️ معاينة:</div>
+            <div style="background:white; padding:8px 12px; border-radius:var(--radius); margin-top:6px;">
+              ${method.icon} <strong>${method.label}</strong> باسم <strong>${method.recipient_name}</strong>
+              ${method.notes ? `<br>📝 ${method.notes}` : ''}
+            </div>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    // 🏦 المحافظ الإلكترونية (Vodafone/Instapay/etc)
+    return `
+      <div class="grid grid-2" style="gap:12px;">
+        <div class="form-group" style="margin:0;">
+          <label>📱 رقم التحويل *</label>
+          <input type="tel" id="pm_${key}_phone" value="${method.phone || ''}"
+                 placeholder="01xxxxxxxxx"
+                 oninput="SettingsModule.updatePaymentField('${key}', 'phone', this.value)">
+          <small class="hint">الرقم اللي العميل يحول عليه</small>
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label>👤 اسم المسؤول *</label>
+          <input type="text" id="pm_${key}_recipient" value="${method.recipient_name || ''}"
+                 placeholder="مثل: الحاج حموده"
+                 oninput="SettingsModule.updatePaymentField('${key}', 'recipient_name', this.value)">
+          <small class="hint">الاسم اللي هيظهر للعميل عشان يتأكد</small>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin:12px 0 0 0;">
+        <label>📝 ملاحظات إضافية (اختياري)</label>
+        <input type="text" id="pm_${key}_notes" value="${method.notes || ''}"
+               placeholder="مثل: أرسل صورة السند بعد التحويل"
+               oninput="SettingsModule.updatePaymentField('${key}', 'notes', this.value)">
+      </div>
+
+      ${method.phone && method.recipient_name ? `
+        <div style="margin-top:12px; padding:10px 12px; background:#F0FDF4; border:1px solid var(--leaf-400); border-radius:var(--radius); font-size:13px;">
+          <div style="font-weight:700; color:var(--leaf-700); margin-bottom:4px;">👁️ معاينة اللي هيظهر للعميل:</div>
+          <div style="background:white; padding:8px 12px; border-radius:var(--radius); margin-top:6px;">
+            ${method.icon} <strong>${method.label}</strong><br>
+            📱 حول على: <strong style="direction:ltr; display:inline-block;">${method.phone}</strong><br>
+            👤 باسم: <strong>${method.recipient_name}</strong>
+            ${method.notes ? `<br>📝 ${method.notes}` : ''}
+          </div>
+        </div>
+      ` : ''}
     `;
   },
 

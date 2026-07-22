@@ -23,7 +23,9 @@ const DEFAULT_PAYMENT_METHODS = {
   instapay:      { enabled: true,  label: "انستا باي",   icon: "🏦", requires_transfer: true, phone: "", recipient_name: "", notes: "" },
   vodafone_cash: { enabled: true,  label: "فودافون كاش", icon: "🔴", requires_transfer: true, phone: "", recipient_name: "", notes: "" },
   etisalat_cash: { enabled: true,  label: "اتصالات كاش", icon: "🟢", requires_transfer: true, phone: "", recipient_name: "", notes: "" },
-  orange_cash:   { enabled: false, label: "أورانج كاش",  icon: "🟠", requires_transfer: true, phone: "", recipient_name: "", notes: "" }
+  orange_cash:   { enabled: false, label: "أورانج كاش",  icon: "🟠", requires_transfer: true, phone: "", recipient_name: "", notes: "" },
+  bank_account:  { enabled: true,  label: "حساب بنكي",   icon: "🏛️", requires_transfer: true, is_bank: true,  bank_name: "", account_number: "", recipient_name: "", notes: "" },
+  cheque:        { enabled: true,  label: "شيك",         icon: "📄", requires_transfer: true, is_cheque: true, recipient_name: "", notes: "" }
 };
 
 // المخازن الافتراضية (بيتم إنشاؤها أول مرة)

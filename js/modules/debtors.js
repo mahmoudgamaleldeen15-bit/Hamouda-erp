@@ -570,11 +570,65 @@ const DebtorsModule = {
     }
     const methods = LocalStore.get('settings/payment_methods') || DEFAULT_PAYMENT_METHODS;
     const method = methods[methodKey];
-    if (!method || !method.requires_transfer || !method.phone) {
+    if (!method || !method.requires_transfer) {
       box.style.display = 'none';
       return;
     }
     box.style.display = 'block';
+
+    const isBank = method.is_bank;
+    const isCheque = method.is_cheque;
+
+    if (isBank) {
+      box.innerHTML = `
+        <div style="padding:12px; background:#F0FDF4; border:1px solid var(--leaf-400); border-radius:var(--radius); font-size:13px;">
+          <div style="font-weight:700; color:var(--leaf-700); margin-bottom:6px;">
+            💳 ${method.icon} ${method.label}
+          </div>
+          <div>🏛️ ${method.bank_name}</div>
+          <div>🔢 <strong style="direction:ltr; display:inline-block;">${method.account_number}</strong></div>
+          <div>👤 ${method.recipient_name}</div>
+          <div class="form-group" style="margin-top:8px; margin-bottom:0;">
+            <label style="font-size:12px;">📌 مرجع التحويل (اختياري)</label>
+            <input type="text" id="debt_bank_ref" placeholder="رقم المرجع"
+                   style="width:100%; padding:6px 10px; border:1px solid var(--gray-300); border-radius:6px; font-size:13px;">
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    if (isCheque) {
+      box.innerHTML = `
+        <div style="padding:12px; background:#FEF3C7; border:1px solid #F59E0B; border-radius:var(--radius); font-size:13px;">
+          <div style="font-weight:700; color:#92400E; margin-bottom:6px;">
+            📄 بيانات الشيك
+          </div>
+          <div class="form-group" style="margin:0 0 8px 0;">
+            <label style="font-size:12px;">🔢 رقم الشيك *</label>
+            <input type="text" id="debt_cheque_number" placeholder="رقم الشيك"
+                   style="width:100%; padding:6px 10px; border:1px solid var(--gray-300); border-radius:6px; font-size:13px;">
+          </div>
+          <div class="form-group" style="margin:0 0 8px 0;">
+            <label style="font-size:12px;">👤 اسم المستفيد</label>
+            <input type="text" id="debt_cheque_recipient" value="${method.recipient_name || ''}" placeholder="اسم المستفيد"
+                   style="width:100%; padding:6px 10px; border:1px solid var(--gray-300); border-radius:6px; font-size:13px;">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px;">📅 تاريخ الاستحقاق (اختياري)</label>
+            <input type="date" id="debt_cheque_due_date"
+                   style="width:100%; padding:6px 10px; border:1px solid var(--gray-300); border-radius:6px; font-size:13px;">
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // المحافظ الإلكترونية
+    if (!method.phone) {
+      box.style.display = 'none';
+      return;
+    }
     box.innerHTML = `
       <div style="padding:12px; background:#F0FDF4; border:1px solid var(--leaf-400); border-radius:var(--radius); font-size:13px;">
         <div style="font-weight:700; color:var(--leaf-700); margin-bottom:6px;">
@@ -609,6 +663,21 @@ const DebtorsModule = {
     // احفظ الدفعة
     const paymentId = genID('pay_');
     const payments = LocalStore.get('payments') || {};
+
+    // ✅ جمع بيانات الشيك/البنك
+    let chequeNumber = '';
+    let chequeRecipient = '';
+    let chequeDueDate = '';
+    let bankReference = '';
+
+    if (method === 'cheque') {
+      chequeNumber = document.getElementById('debt_cheque_number')?.value.trim() || '';
+      chequeRecipient = document.getElementById('debt_cheque_recipient')?.value.trim() || '';
+      chequeDueDate = document.getElementById('debt_cheque_due_date')?.value || '';
+    } else if (method === 'bank_account') {
+      bankReference = document.getElementById('debt_bank_ref')?.value.trim() || '';
+    }
+
     payments[paymentId] = {
       _id: paymentId,
       type: 'sales_payment',
@@ -620,6 +689,10 @@ const DebtorsModule = {
       date: date,
       received_by: currentUser._id,
       notes: notes,
+      cheque_number: chequeNumber,
+      cheque_recipient: chequeRecipient,
+      cheque_due_date: chequeDueDate,
+      bank_reference: bankReference,
       created_at: Date.now()
     };
     LocalStore.set('payments', payments);
