@@ -59,6 +59,22 @@ const CloudSync = {
       window.addEventListener('online', () => this.handleOnline());
       window.addEventListener('offline', () => this.handleOffline());
 
+      // ⭐ لما المستخدم يرجع للتاب/التطبيق - نعمل sync
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && this.isInitialized && this.isOnline) {
+          console.log('☁️ App became visible - triggering sync');
+          setTimeout(() => this.fullSync(true), 500);
+        }
+      });
+
+      // ⭐ لما يفوكس على النافذة - refresh
+      window.addEventListener('focus', () => {
+        if (this.isInitialized && this.isOnline) {
+          console.log('☁️ Window focused - refresh UI');
+          setTimeout(() => this._doActualRefresh(), 300);
+        }
+      });
+
       // Firebase connection state
       this.db.ref('.info/connected').on('value', (snap) => {
         this.isOnline = snap.val() === true && navigator.onLine;
@@ -177,22 +193,92 @@ const CloudSync = {
       'counters'
     ];
 
+    // ⭐ استخدام value listener بدلاً من child_added
+    // ده بيعمل شغل أوثق على الموبايل (Chrome mobile بيوقف child_* في الخلفية أحياناً)
     realtimePaths.forEach(path => {
-      // نستنى شوية قبل ما نبدأ الـ listener عشان مايتفعلش عند التحميل الأولي
       setTimeout(() => {
-        this.db.ref(path).on('child_added', (snap) => {
-          this.handleRemoteChange(path, snap.key, snap.val(), 'added');
+        this.db.ref(path).on('value', (snap) => {
+          const remoteData = snap.val();
+          this.handlePathUpdate(path, remoteData);
+        }, (err) => {
+          console.warn(`❌ Listener error on ${path}:`, err);
         });
-
-        this.db.ref(path).on('child_changed', (snap) => {
-          this.handleRemoteChange(path, snap.key, snap.val(), 'changed');
-        });
-
-        this.db.ref(path).on('child_removed', (snap) => {
-          this.handleRemoteRemoval(path, snap.key);
-        });
-      }, 3000); // 3 ثواني بعد الـ init
+      }, 3000);
     });
+  },
+
+  // ⭐ Handle full path update - أوثق من child_added على الموبايل
+  handlePathUpdate(path, remoteData) {
+    if (!remoteData) {
+      // Path اتمسح كلياً
+      console.log(`☁️ Path cleared: ${path}`);
+      const localData = LocalStore.get(path);
+      if (localData && Object.keys(localData).length > 0) {
+        LocalStore.set(path, {}, true);
+        this.scheduleRefresh();
+      }
+      return;
+    }
+
+    const localData = LocalStore.get(path) || {};
+    let hasChanges = false;
+    let addedCount = 0;
+    let changedCount = 0;
+    let newItemInfo = null;
+
+    // مقارنة كل key
+    Object.keys(remoteData).forEach(key => {
+      const remoteItem = remoteData[key];
+      const localItem = localData[key];
+
+      if (!remoteItem || typeof remoteItem !== 'object') {
+        // Simple value
+        if (localItem !== remoteItem) {
+          localData[key] = remoteItem;
+          hasChanges = true;
+          changedCount++;
+        }
+        return;
+      }
+
+      if (!localItem) {
+        // إضافة جديدة
+        localData[key] = remoteItem;
+        hasChanges = true;
+        addedCount++;
+        newItemInfo = { path, key, data: remoteItem };
+      } else {
+        // مقارنة timestamps
+        const remoteTime = remoteItem._synced_at || remoteItem.updated_at || remoteItem.created_at || 0;
+        const localTime = localItem._synced_at || localItem.updated_at || localItem.created_at || 0;
+
+        if (remoteTime > localTime) {
+          localData[key] = remoteItem;
+          hasChanges = true;
+          changedCount++;
+        }
+      }
+    });
+
+    // فحص اللي اتمسح - موجود محلياً بس مش في السحابة
+    Object.keys(localData).forEach(key => {
+      if (!remoteData[key]) {
+        delete localData[key];
+        hasChanges = true;
+      }
+    });
+
+    if (hasChanges) {
+      console.log(`☁️ ${path}: +${addedCount} ~${changedCount}`);
+      LocalStore.set(path, localData, true);
+
+      // إشعار للـ user لو فيه إضافة
+      if (addedCount > 0 && newItemInfo) {
+        this.notifyChange(newItemInfo.path, 'added', newItemInfo.data);
+      }
+
+      this.scheduleRefresh();
+    }
   },
 
   handleRemoteChange(path, key, data, type) {
@@ -242,13 +328,37 @@ const CloudSync = {
 
   // ⭐ Schedule refresh - debounced
   scheduleRefresh() {
-    if (this._refreshTimer) clearTimeout(this._refreshTimer);
     this._pendingUpdatesCount++;
-    this._refreshTimer = setTimeout(() => {
-      this._doActualRefresh();
-      this._refreshTimer = null;
-      this._pendingUpdatesCount = 0;
-    }, 500);
+
+    // ⭐ رندر فوري - بدون setTimeout عشان الموبايل مش يوقف الـ timers
+    // نستخدم requestAnimationFrame للأداء الأفضل
+    if (this._refreshTimer) {
+      cancelAnimationFrame(this._refreshTimer);
+    }
+
+    this._refreshTimer = requestAnimationFrame(() => {
+      // Small delay to batch updates
+      setTimeout(() => {
+        try {
+          this._doActualRefresh();
+        } catch (e) {
+          console.error('Refresh failed:', e);
+        }
+        this._refreshTimer = null;
+        this._pendingUpdatesCount = 0;
+      }, 200);
+    });
+
+    // ⭐ Backup: force refresh بعد ثانية حتى لو الـ animation frame مش شغال
+    if (this._backupTimer) clearTimeout(this._backupTimer);
+    this._backupTimer = setTimeout(() => {
+      if (this._pendingUpdatesCount > 0) {
+        console.log('🔄 Backup refresh triggered');
+        this._doActualRefresh();
+        this._pendingUpdatesCount = 0;
+        this._backupTimer = null;
+      }
+    }, 1000);
   },
 
   _notificationBuffer: [],
