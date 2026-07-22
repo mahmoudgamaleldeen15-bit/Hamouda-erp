@@ -202,25 +202,31 @@ const CloudSync = {
     const localData = LocalStore.get(path) || {};
     const localItem = localData[key];
 
+    let didUpdate = false;
+
     // لو مش موجود محلياً - أضفه
     if (!localItem) {
       localData[key] = data;
       LocalStore.set(path, localData, true); // skipSync = true
-      this.notifyChange(path, type, data);
-      this.refreshCurrentPage();
-      return;
+      didUpdate = true;
+      console.log(`☁️ Added: ${path}/${key}`);
+    } else {
+      // مقارنة timestamps
+      const remoteTime = data._synced_at || data.updated_at || data.created_at || 0;
+      const localTime = localItem._synced_at || localItem.updated_at || localItem.created_at || 0;
+
+      // Remote أحدث - حدّث محلياً
+      if (remoteTime > localTime) {
+        localData[key] = data;
+        LocalStore.set(path, localData, true); // skipSync = true
+        didUpdate = true;
+        console.log(`☁️ Updated: ${path}/${key}`);
+      }
     }
 
-    // مقارنة timestamps
-    const remoteTime = data._synced_at || data.updated_at || data.created_at || 0;
-    const localTime = localItem._synced_at || localItem.updated_at || localItem.created_at || 0;
-
-    // Remote أحدث - حدّث محلياً
-    if (remoteTime > localTime) {
-      localData[key] = data;
-      LocalStore.set(path, localData, true); // skipSync = true
+    if (didUpdate) {
       this.notifyChange(path, type, data);
-      this.refreshCurrentPage();
+      this.scheduleRefresh(); // ⭐ استخدم scheduleRefresh - debounced
     }
   },
 
@@ -229,8 +235,20 @@ const CloudSync = {
     if (localData[key]) {
       delete localData[key];
       LocalStore.set(path, localData, true);
-      this.refreshCurrentPage();
+      console.log(`☁️ Removed: ${path}/${key}`);
+      this.scheduleRefresh();
     }
+  },
+
+  // ⭐ Schedule refresh - debounced
+  scheduleRefresh() {
+    if (this._refreshTimer) clearTimeout(this._refreshTimer);
+    this._pendingUpdatesCount++;
+    this._refreshTimer = setTimeout(() => {
+      this._doActualRefresh();
+      this._refreshTimer = null;
+      this._pendingUpdatesCount = 0;
+    }, 500);
   },
 
   _notificationBuffer: [],
@@ -694,16 +712,8 @@ const CloudSync = {
   _pendingUpdatesCount: 0,
 
   refreshCurrentPage() {
-    // Debounce - نجمع كل التحديثات في 500ms ثم نعمل رندر مرة واحدة
-    this._pendingUpdatesCount++;
-
-    if (this._refreshTimer) clearTimeout(this._refreshTimer);
-
-    this._refreshTimer = setTimeout(() => {
-      this._doActualRefresh();
-      this._refreshTimer = null;
-      this._pendingUpdatesCount = 0;
-    }, 500);
+    // Alias to scheduleRefresh (backwards compatible)
+    this.scheduleRefresh();
   },
 
   refreshCurrentPageNow() {
@@ -718,10 +728,15 @@ const CloudSync = {
 
   _doActualRefresh() {
     try {
-      // اتاكد إن المستخدم في mainApp (مش في splash أو login)
-      const mainApp = document.getElementById('mainApp');
-      if (!mainApp || !mainApp.classList.contains('active')) {
-        console.log('Not in main app, skip refresh');
+      // فحص ذكي - لو في login أو splash، متعملش رندر
+      const loginScreen = document.getElementById('loginScreen');
+      const splashScreen = document.getElementById('splash');
+      const firstRunScreen = document.getElementById('firstRunScreen');
+
+      if ((loginScreen && loginScreen.classList.contains('active')) ||
+          (splashScreen && splashScreen.classList.contains('active')) ||
+          (firstRunScreen && firstRunScreen.classList.contains('active'))) {
+        console.log('In login/splash/setup screen, skip refresh');
         return;
       }
 
