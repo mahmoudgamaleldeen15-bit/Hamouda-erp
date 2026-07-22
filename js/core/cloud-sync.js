@@ -272,12 +272,81 @@ const CloudSync = {
       console.log(`☁️ ${path}: +${addedCount} ~${changedCount}`);
       LocalStore.set(path, localData, true);
 
+      // ⭐ لو حركات مخزون اتغيرت - أعد حساب الرصيد
+      if (path === 'inventory_txns') {
+        this.recomputeAffectedInventories(remoteData);
+      }
+
       // إشعار للـ user لو فيه إضافة
       if (addedCount > 0 && newItemInfo) {
         this.notifyChange(newItemInfo.path, 'added', newItemInfo.data);
       }
 
       this.scheduleRefresh();
+    }
+  },
+
+  // ⭐ إعادة حساب رصيد المخازن بعد استقبال حركات جديدة
+  recomputeAffectedInventories(txnsData) {
+    if (typeof TxnEngine === 'undefined') return;
+
+    try {
+      // جمع كل التوليفات (warehouse_id + product_id) المتأثرة
+      const affected = new Set();
+      Object.values(txnsData).forEach(txn => {
+        if (txn && txn.warehouse_id && txn.product_id) {
+          affected.add(`${txn.warehouse_id}||${txn.product_id}`);
+        }
+      });
+
+      // إعادة حساب كل توليفة
+      affected.forEach(key => {
+        const [whId, prodId] = key.split('||');
+        if (whId && prodId) {
+          try {
+            TxnEngine.recomputeStock(whId, prodId);
+          } catch(e) {
+            console.warn(`Recompute failed for ${whId}/${prodId}:`, e);
+          }
+        }
+      });
+
+      if (affected.size > 0) {
+        console.log(`✅ Recomputed ${affected.size} inventory items`);
+      }
+    } catch(e) {
+      console.error('Recompute inventories failed:', e);
+    }
+  },
+
+  // ⭐ إعادة حساب كل المخزون من كل الحركات (بعد fullSync)
+  recomputeAllInventories() {
+    if (typeof TxnEngine === 'undefined') return;
+
+    try {
+      const txns = LocalStore.get('inventory_txns') || {};
+      const affected = new Set();
+
+      Object.values(txns).forEach(txn => {
+        if (txn && txn.warehouse_id && txn.product_id) {
+          affected.add(`${txn.warehouse_id}||${txn.product_id}`);
+        }
+      });
+
+      affected.forEach(key => {
+        const [whId, prodId] = key.split('||');
+        if (whId && prodId) {
+          try {
+            TxnEngine.recomputeStock(whId, prodId);
+          } catch(e) {
+            console.warn(`Recompute failed for ${whId}/${prodId}:`, e);
+          }
+        }
+      });
+
+      console.log(`✅ Full inventory recompute: ${affected.size} items`);
+    } catch(e) {
+      console.error('Full recompute failed:', e);
     }
   },
 
@@ -566,7 +635,10 @@ const CloudSync = {
       // 2. Upload pending queue
       await this.flushPendingQueue();
 
-      // 3. Update last sync
+      // ⭐ 3. إعادة حساب كل رصيد المخزون من الحركات (ضمان الدقة)
+      this.recomputeAllInventories();
+
+      // 4. Update last sync
       this.lastSyncAt = Date.now();
       this.lastSyncStatus = errorCount === 0 ? 'success' : 'partial';
       LocalStore.set('_cloud_last_sync', this.lastSyncAt);

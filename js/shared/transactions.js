@@ -181,22 +181,48 @@ const TxnEngine = {
   },
 
   // ==========================================================
-  // إعادة حساب الرصيد من الحركات (recovery)
+  // إعادة حساب الرصيد + متوسط التكلفة من الحركات (recovery)
   // ==========================================================
   recomputeStock(warehouse_id, product_id) {
     const txns = LocalStore.get('inventory_txns') || {};
-    const relevant = Object.values(txns).filter(
-      t => t.warehouse_id === warehouse_id && t.product_id === product_id
-    );
+    const relevant = Object.values(txns)
+      .filter(t => t.warehouse_id === warehouse_id && t.product_id === product_id)
+      .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
-    const total = relevant.reduce((sum, t) => sum + Number(t.quantity), 0);
+    let currentStock = 0;
+    let avgCost = 0;
+    let lastPurchasePrice = 0;
+    let lastSalePrice = 0;
+
+    // نمشي على الحركات بالترتيب ونحسب المتوسط الحسابي المتحرك
+    relevant.forEach(t => {
+      const qty = Number(t.quantity) || 0;
+      const unitCost = Number(t.unit_cost) || Number(t.unit_price) || 0;
+
+      if (qty > 0) {
+        // شراء أو رجوع مبيعات - تحديث متوسط التكلفة
+        const newTotal = currentStock + qty;
+        if (newTotal > 0) {
+          avgCost = ((currentStock * avgCost) + (qty * unitCost)) / newTotal;
+        }
+        if (t.type === 'purchase') lastPurchasePrice = unitCost;
+      } else if (qty < 0) {
+        // بيع - آخر سعر بيع
+        if (t.type === 'sale' && unitCost > 0) lastSalePrice = unitCost;
+      }
+
+      currentStock += qty;
+    });
 
     this.updateInventoryCache(warehouse_id, product_id, {
-      current_stock: total,
+      current_stock: currentStock,
+      average_cost: avgCost,
+      last_purchase_price: lastPurchasePrice,
+      last_sale_price: lastSalePrice,
       last_updated: Date.now()
     });
 
-    return total;
+    return currentStock;
   },
 
   // ==========================================================

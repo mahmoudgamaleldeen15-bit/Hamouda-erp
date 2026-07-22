@@ -73,10 +73,21 @@ const NotificationCenter = {
       // ✅ فصل المخازن: قائمة الأصناف اللي لها حركات في كل مخزن
       const txns = Object.values(LocalStore.get('inventory_txns') || {});
       const productsPerWarehouse = {};
+      const lastTxnPerWarehouseProduct = {}; // آخر transaction لكل صنف في كل مخزن
+
       txns.forEach(t => {
         if (!productsPerWarehouse[t.warehouse_id]) productsPerWarehouse[t.warehouse_id] = new Set();
         productsPerWarehouse[t.warehouse_id].add(t.product_id);
+
+        // تتبع آخر transaction
+        const key = `${t.warehouse_id}_${t.product_id}`;
+        if (!lastTxnPerWarehouseProduct[key] || t.created_at > lastTxnPerWarehouseProduct[key]) {
+          lastTxnPerWarehouseProduct[key] = t.created_at;
+        }
       });
+
+      // آخر 30 يوم فقط - الأصناف اللي عليها نشاط حديث
+      const activityThreshold = now - (30 * 24 * 60 * 60 * 1000);
 
       const lowStockItems = [];
       const outOfStockItems = [];
@@ -89,33 +100,65 @@ const NotificationCenter = {
           if (!p) return;
           // ✅ اعرض بس الأصناف اللي عليها حركات في المخزن ده
           if (!productsInHere.has(item.product_id)) return;
+
+          // ✅ اعرض فقط الأصناف اللي عليها نشاط في آخر 30 يوم
+          const lastActivity = lastTxnPerWarehouseProduct[`${whId}_${item.product_id}`] || 0;
+          if (lastActivity < activityThreshold) return;
+
+          // ✅ Out of stock - بس لو الصنف عليه min_stock > 0 (يعني المستخدم مهتم بتحذير)
           if (item.current_stock <= 0) {
-            outOfStockItems.push({ product: p, warehouse: warehouses[whId] });
-          } else if (item.current_stock <= (p.min_stock || 0)) {
+            if ((p.min_stock || 0) > 0) {
+              outOfStockItems.push({ product: p, warehouse: warehouses[whId] });
+            }
+          } else if (item.current_stock <= (p.min_stock || 0) && (p.min_stock || 0) > 0) {
             lowStockItems.push({ product: p, warehouse: warehouses[whId], stock: item.current_stock });
           }
         });
       });
 
       if (outOfStockItems.length > 0) {
+        // ✅ تجميع حسب المخزن للوضوح
+        const byWarehouse = {};
+        outOfStockItems.forEach(item => {
+          const whName = item.warehouse.name;
+          if (!byWarehouse[whName]) byWarehouse[whName] = [];
+          byWarehouse[whName].push(item.product.name);
+        });
+
+        const desc = Object.entries(byWarehouse)
+          .map(([whName, items]) => `🏢 ${whName}: ${items.slice(0, 3).join('، ')}${items.length > 3 ? '...' : ''}`)
+          .join(' | ');
+
         notifs.push({
           id: 'stock_out',
           severity: 'high',
           icon: '📦',
           title: `${outOfStockItems.length} صنف نافذ من المخزون`,
-          description: outOfStockItems.slice(0, 3).map(i => i.product.name).join('، ') + (outOfStockItems.length > 3 ? '...' : ''),
+          description: desc,
           action: 'inventory',
           created_at: now
         });
       }
 
       if (lowStockItems.length > 0) {
+        // ✅ تجميع حسب المخزن للوضوح
+        const byWarehouse = {};
+        lowStockItems.forEach(item => {
+          const whName = item.warehouse.name;
+          if (!byWarehouse[whName]) byWarehouse[whName] = [];
+          byWarehouse[whName].push(`${item.product.name} (${fmtMoney(item.stock)})`);
+        });
+
+        const desc = Object.entries(byWarehouse)
+          .map(([whName, items]) => `🏢 ${whName}: ${items.slice(0, 3).join('، ')}${items.length > 3 ? '...' : ''}`)
+          .join(' | ');
+
         notifs.push({
           id: 'stock_low',
           severity: 'medium',
           icon: '⚠️',
           title: `${lowStockItems.length} صنف رصيده منخفض`,
-          description: lowStockItems.slice(0, 3).map(i => `${i.product.name} (${fmtMoney(i.stock)})`).join('، '),
+          description: desc,
           action: 'inventory',
           created_at: now
         });

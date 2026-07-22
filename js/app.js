@@ -565,3 +565,19 @@ window.addEventListener('load', () => {
     document.body.classList.add('install-not-available');
   }
 });
+
+// ==========================================================
+// 📱 Auto-hide swipe hint on tables when scrolled
+// ==========================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Delegation - listener عام لكل الجداول
+  document.addEventListener('scroll', (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains('table-container')) {
+      if (e.target.scrollLeft > 10) {
+        e.target.classList.add('scrolled');
+      } else {
+        e.target.classList.remove('scrolled');
+      }
+    }
+  }, true); // useCapture عشان نستقبل scroll events من children
+});

@@ -703,3 +703,134 @@ body.install-not-available .install-banner {
   background: #FEE2E2;
   color: #991B1B;
 }
+
+/* ==========================================================
+   📱 Mobile Table Enhancements
+   ========================================================== */
+@media (max-width: 768px) {
+  /* الجدول: خط أصغر شوية على الموبايل بس واضح */
+  .table-container table {
+    font-size: 13px;
+    min-width: 650px; /* أقل شوية عشان يبان أعمدة أكتر */
+  }
+
+  .table-container th,
+  .table-container td {
+    padding: 10px 8px;
+    white-space: nowrap; /* منع wrap عشان الأعمدة تبقى واضحة */
+  }
+
+  .table-container th {
+    font-size: 12px;
+  }
+
+  /* مؤشر السحب - سهم صغير في اليسار */
+  .table-container {
+    position: relative;
+    box-shadow: inset -12px 0 8px -8px rgba(124, 58, 237, 0.15);
+  }
+
+  .table-container::after {
+    content: "◀";
+    position: absolute;
+    top: 50%;
+    left: 8px;
+    transform: translateY(-50%);
+    color: var(--grape-400);
+    font-size: 16px;
+    animation: swipeHint 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 5;
+    text-shadow: 0 0 4px white;
+  }
+
+  @keyframes swipeHint {
+    0%, 100% { transform: translateY(-50%) translateX(0); opacity: 0.4; }
+    50% { transform: translateY(-50%) translateX(-6px); opacity: 1; }
+  }
+
+  /* لما المستخدم بيسحب - نخفي المؤشر */
+  .table-container.scrolled::after {
+    display: none;
+  }
+
+  /* Cards على الموبايل - padding أقل */
+  .card {
+    padding: 12px;
+  }
+
+  .page-header {
+    padding: 12px 0;
+  }
+
+  .page-title {
+    font-size: 18px;
+  }
+
+  .page-subtitle {
+    font-size: 12px;
+  }
+
+  /* Grid cards على الموبايل - عمود واحد */
+  .grid-4, .grid-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px;
+  }
+
+  .grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Stat cards - أصغر */
+  .stat-card {
+    padding: 12px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+  }
+
+  /* Header buttons على الموبايل */
+  .nav-actions .icon-btn {
+    padding: 6px;
+    font-size: 16px;
+  }
+
+  /* Modal على الموبايل - full width */
+  .modal {
+    max-width: 95vw !important;
+    margin: 10px auto;
+  }
+
+  /* Forms على الموبايل */
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    font-size: 15px; /* منع zoom في iOS */
+    padding: 10px;
+  }
+
+  /* Filter buttons أصغر */
+  .btn-sm {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+
+/* ==========================================================
+   📱 موبايل صغير جداً (< 400px)
+   ========================================================== */
+@media (max-width: 400px) {
+  .table-container table {
+    font-size: 12px;
+    min-width: 600px;
+  }
+
+  .grid-4, .grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}

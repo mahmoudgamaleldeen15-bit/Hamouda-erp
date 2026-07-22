@@ -222,14 +222,37 @@
 .table-container {
   background: white;
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--gray-100);
+  -webkit-overflow-scrolling: touch; /* smooth scroll على iOS */
+  position: relative;
+}
+
+/* Scroll indicator بشكل سلس على الموبايل */
+.table-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: var(--gray-100);
+  border-radius: 3px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background: var(--grape-400);
+  border-radius: 3px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+  background: var(--grape-600);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 700px; /* الحد الأدنى للـ table عشان الأعمدة تتمدد */
 }
 
 th {
