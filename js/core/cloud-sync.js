@@ -233,20 +233,57 @@ const CloudSync = {
     }
   },
 
+  _notificationBuffer: [],
+  _notificationTimer: null,
+
   notifyChange(path, type, data) {
-    // إشعار خفيف فقط للتحديثات المهمة
+    // إشعار خفيف للتحديثات المهمة فقط
     const importantPaths = {
-      'sales_invoices': '💰 فاتورة بيع',
-      'purchase_invoices': '🛒 فاتورة شراء',
-      'payments': '💵 دفعة',
-      'sales_returns': '🔄 مرتجع بيع',
-      'purchase_returns': '🔄 مرتجع شراء'
+      'sales_invoices': { icon: '💰', label: 'فاتورة بيع' },
+      'purchase_invoices': { icon: '🛒', label: 'فاتورة شراء' },
+      'payments': { icon: '💵', label: 'دفعة' },
+      'sales_returns': { icon: '🔄', label: 'مرتجع بيع' },
+      'purchase_returns': { icon: '🔄', label: 'مرتجع شراء' }
     };
 
     if (importantPaths[path] && type === 'added') {
-      const label = importantPaths[path];
+      const info = importantPaths[path];
       const number = data.invoice_number || data.return_number || '';
-      console.log(`☁️ ${label} جديدة: ${number}`);
+      console.log(`☁️ ${info.icon} ${info.label} جديدة: ${number}`);
+
+      // ضيف للـ buffer
+      this._notificationBuffer.push({
+        icon: info.icon,
+        label: info.label,
+        number: number
+      });
+
+      // debounce - نجمع كل الإشعارات ونعرضهم مرة واحدة
+      if (this._notificationTimer) clearTimeout(this._notificationTimer);
+      this._notificationTimer = setTimeout(() => {
+        this._showBufferedNotifications();
+      }, 800);
+    }
+  },
+
+  _showBufferedNotifications() {
+    const items = this._notificationBuffer;
+    this._notificationBuffer = [];
+    this._notificationTimer = null;
+
+    if (items.length === 0) return;
+
+    if (items.length === 1) {
+      const item = items[0];
+      this.showNotif(`☁️ ${item.icon} ${item.label} جديدة: ${item.number}`, 'info', 3500);
+    } else {
+      // Multiple items - عرض ملخص
+      const summary = {};
+      items.forEach(item => {
+        summary[item.label] = (summary[item.label] || 0) + 1;
+      });
+      const parts = Object.entries(summary).map(([label, count]) => `${count} ${label}`);
+      this.showNotif(`☁️ تم استقبال ${items.length} تحديث: ${parts.join('، ')}`, 'info', 4000);
     }
   },
 
@@ -414,8 +451,8 @@ const CloudSync = {
         }
       }
 
-      // Refresh UI if needed
-      this.refreshCurrentPage();
+      // Refresh UI immediately (بدون debouncing لأنه manual sync)
+      this.refreshCurrentPageNow();
 
       return { success: true, successCount, errorCount, errors };
     } catch (e) {
@@ -650,16 +687,70 @@ const CloudSync = {
     }
   },
 
+  // ==========================================================
+  // 🔄 Refresh Current Page - محسّن مع debouncing
+  // ==========================================================
+  _refreshTimer: null,
+  _pendingUpdatesCount: 0,
+
   refreshCurrentPage() {
-    // Trigger re-render of current module if possible
-    if (typeof currentModule !== 'undefined' && currentModule) {
-      try {
-        if (MODULES[currentModule] && MODULES[currentModule].render) {
+    // Debounce - نجمع كل التحديثات في 500ms ثم نعمل رندر مرة واحدة
+    this._pendingUpdatesCount++;
+
+    if (this._refreshTimer) clearTimeout(this._refreshTimer);
+
+    this._refreshTimer = setTimeout(() => {
+      this._doActualRefresh();
+      this._refreshTimer = null;
+      this._pendingUpdatesCount = 0;
+    }, 500);
+  },
+
+  refreshCurrentPageNow() {
+    // Immediate refresh - بدون debouncing (للاستخدام في fullSync اليدوي)
+    if (this._refreshTimer) {
+      clearTimeout(this._refreshTimer);
+      this._refreshTimer = null;
+    }
+    this._doActualRefresh();
+    this._pendingUpdatesCount = 0;
+  },
+
+  _doActualRefresh() {
+    try {
+      // اتاكد إن المستخدم في mainApp (مش في splash أو login)
+      const mainApp = document.getElementById('mainApp');
+      if (!mainApp || !mainApp.classList.contains('active')) {
+        console.log('Not in main app, skip refresh');
+        return;
+      }
+
+      // 1. حاول إعادة رندر الـ module الحالي
+      if (typeof currentModule !== 'undefined' && currentModule) {
+        if (typeof MODULES !== 'undefined' && MODULES[currentModule] && MODULES[currentModule].render) {
+          console.log(`🔄 Refreshing module: ${currentModule}`);
           MODULES[currentModule].render();
         }
-      } catch (e) {
-        // Silent fail
       }
+
+      // 2. حدّث Sidebar counters وBadges
+      if (typeof updateSidebarCounters === 'function') {
+        updateSidebarCounters();
+      }
+
+      // 3. حدّث الجرس والإشعارات
+      if (typeof NotificationsModule !== 'undefined' && NotificationsModule.updateBell) {
+        NotificationsModule.updateBell();
+      }
+
+      // 4. Dispatch event للـ modules الأخرى تسمع
+      window.dispatchEvent(new CustomEvent('cloud-data-updated', {
+        detail: { count: this._pendingUpdatesCount }
+      }));
+
+      console.log(`✅ UI Refreshed (${this._pendingUpdatesCount} updates)`);
+    } catch (e) {
+      console.warn('Refresh failed:', e);
     }
   },
 
