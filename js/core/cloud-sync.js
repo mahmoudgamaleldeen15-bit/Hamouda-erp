@@ -736,34 +736,64 @@ const CloudSync = {
       if ((loginScreen && loginScreen.classList.contains('active')) ||
           (splashScreen && splashScreen.classList.contains('active')) ||
           (firstRunScreen && firstRunScreen.classList.contains('active'))) {
-        console.log('In login/splash/setup screen, skip refresh');
+        console.log('☁️ Cloud: In login/splash/setup screen, skip refresh');
         return;
       }
 
       // 1. حاول إعادة رندر الـ module الحالي
-      if (typeof currentModule !== 'undefined' && currentModule) {
-        if (typeof MODULES !== 'undefined' && MODULES[currentModule] && MODULES[currentModule].render) {
-          console.log(`🔄 Refreshing module: ${currentModule}`);
+      let refreshed = false;
+
+      // الطريقة الأولى: currentModule global
+      if (typeof currentModule !== 'undefined' && currentModule && typeof MODULES !== 'undefined' && MODULES[currentModule]) {
+        try {
+          console.log(`☁️ Refreshing module: ${currentModule}`);
           MODULES[currentModule].render();
+          refreshed = true;
+        } catch (e) {
+          console.warn('Module render failed:', e);
+        }
+      }
+
+      // Fallback: نحاول نعرف الـ module من الـ active nav
+      if (!refreshed) {
+        const activeNav = document.querySelector('.nav-item.active');
+        if (activeNav) {
+          const moduleName = activeNav.getAttribute('data-module');
+          if (moduleName && typeof MODULES !== 'undefined' && MODULES[moduleName]) {
+            try {
+              console.log(`☁️ Refreshing module (via nav): ${moduleName}`);
+              MODULES[moduleName].render();
+              refreshed = true;
+            } catch (e) {
+              console.warn('Nav module render failed:', e);
+            }
+          }
         }
       }
 
       // 2. حدّث Sidebar counters وBadges
       if (typeof updateSidebarCounters === 'function') {
-        updateSidebarCounters();
+        try { updateSidebarCounters(); } catch(e) {}
+      }
+      if (typeof updateDebtorsBadge === 'function') {
+        try { updateDebtorsBadge(); } catch(e) {}
       }
 
       // 3. حدّث الجرس والإشعارات
       if (typeof NotificationsModule !== 'undefined' && NotificationsModule.updateBell) {
-        NotificationsModule.updateBell();
+        try { NotificationsModule.updateBell(); } catch(e) {}
       }
 
       // 4. Dispatch event للـ modules الأخرى تسمع
       window.dispatchEvent(new CustomEvent('cloud-data-updated', {
-        detail: { count: this._pendingUpdatesCount }
+        detail: { count: this._pendingUpdatesCount, refreshed }
       }));
 
-      console.log(`✅ UI Refreshed (${this._pendingUpdatesCount} updates)`);
+      if (refreshed) {
+        console.log(`✅ UI Refreshed (${this._pendingUpdatesCount} updates)`);
+      } else {
+        console.warn('⚠️ Could not identify current module for refresh');
+      }
     } catch (e) {
       console.warn('Refresh failed:', e);
     }

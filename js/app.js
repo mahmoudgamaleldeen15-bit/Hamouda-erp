@@ -96,12 +96,20 @@ const MODULES = {
 // ==========================================================
 // Switch between modules
 // ==========================================================
+// ==========================================================
+// Global state
+// ==========================================================
+let currentModule = null;
+
 function switchModule(name) {
   const module = MODULES[name];
   if (!module) {
     showNotif('❌ Module غير موجود', 'danger');
     return;
   }
+
+  // ⭐ حفظ الـ module الحالي (مهم للـ auto-refresh)
+  currentModule = name;
 
   // Update active nav item
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
