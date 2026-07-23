@@ -123,8 +123,18 @@ const LocalStore = {
       // Upload each record separately
       for (const key of keys) {
         const item = data[key];
-        // Skip if already synced
-        if (item._synced_at) continue;
+        if (!item) continue;
+
+        // ✅ نرفع لو:
+        // 1. لسه ما اتزامنش أبداً (_synced_at غير موجود)
+        // 2. أو اتحدث بعد آخر مزامنة (updated_at > _synced_at)
+        const syncedAt = item._synced_at || 0;
+        const updatedAt = item.updated_at || item.created_at || 0;
+
+        if (syncedAt > 0 && syncedAt >= updatedAt) {
+          continue; // اتزامن ومفيش تحديث - سيبه
+        }
+
         await CloudSync.uploadItem(path, key, item);
       }
     } else {

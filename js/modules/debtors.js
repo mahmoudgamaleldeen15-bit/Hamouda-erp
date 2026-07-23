@@ -704,6 +704,12 @@ const DebtorsModule = {
     if (inv.remaining === 0) inv.status = 'paid';
     else inv.status = 'partial';
 
+    // ✅ تحديث updated_at عشان الرفع للسحابة يشتغل
+    inv.updated_at = Date.now();
+    inv.updated_by = currentUser._id;
+    // إزالة _synced_at عشان يبقى محتاج إعادة رفع
+    delete inv._synced_at;
+
     // اضف الدفعة لـ payments array في الفاتورة (لو موجودة)
     if (!inv.payments) inv.payments = [];
     inv.payments.push({
@@ -722,6 +728,9 @@ const DebtorsModule = {
     const cust = customers[inv.customer_id];
     if (cust) {
       cust.cached_total_debt = Math.max(0, (cust.cached_total_debt || 0) - amount);
+      // ✅ تحديث updated_at للعميل
+      cust.updated_at = Date.now();
+      delete cust._synced_at;
       customers[inv.customer_id] = cust;
       LocalStore.set('customers', customers);
     }
@@ -955,6 +964,11 @@ const DebtorsModule = {
       if (inv.remaining === 0) inv.status = 'paid';
       else inv.status = 'partial';
 
+      // ✅ تحديث updated_at عشان الرفع يشتغل
+      inv.updated_at = Date.now();
+      inv.updated_by = currentUser._id;
+      delete inv._synced_at;
+
       if (!inv.payments) inv.payments = [];
       inv.payments.push({
         amount: alloc,
@@ -979,6 +993,8 @@ const DebtorsModule = {
     const cust = customers[customerId];
     if (cust) {
       cust.cached_total_debt = Math.max(0, (cust.cached_total_debt || 0) - totalAllocated);
+      cust.updated_at = Date.now();
+      delete cust._synced_at;
       customers[customerId] = cust;
       LocalStore.set('customers', customers);
     }

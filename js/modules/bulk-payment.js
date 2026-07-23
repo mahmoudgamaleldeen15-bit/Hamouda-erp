@@ -508,6 +508,11 @@ const BulkPaymentModule = {
     inv.remaining = Math.max(0, inv.grand_total - inv.paid);
     inv.status = inv.remaining === 0 ? 'paid' : 'partial';
 
+    // ✅ تحديث updated_at عشان الرفع يشتغل
+    inv.updated_at = Date.now();
+    inv.updated_by = currentUser._id;
+    delete inv._synced_at;
+
     if (!inv.payments) inv.payments = [];
     inv.payments.push({
       amount: dist.amount,
@@ -526,6 +531,8 @@ const BulkPaymentModule = {
     const cust = customers[inv.customer_id];
     if (cust) {
       cust.cached_total_debt = Math.max(0, (cust.cached_total_debt || 0) - dist.amount);
+      cust.updated_at = Date.now();
+      delete cust._synced_at;
       customers[inv.customer_id] = cust;
       LocalStore.set('customers', customers);
     }
@@ -563,6 +570,11 @@ const BulkPaymentModule = {
     inv.remaining = Math.max(0, inv.grand_total - inv.paid);
     inv.status = inv.remaining === 0 ? 'paid' : 'partial';
 
+    // ✅ تحديث updated_at عشان الرفع يشتغل
+    inv.updated_at = Date.now();
+    inv.updated_by = currentUser._id;
+    delete inv._synced_at;
+
     if (!inv.payments) inv.payments = [];
     inv.payments.push({
       amount: dist.amount,
@@ -581,6 +593,8 @@ const BulkPaymentModule = {
     const sup = suppliers[inv.supplier_id];
     if (sup) {
       sup.cached_total_debt_to_them = Math.max(0, (sup.cached_total_debt_to_them || 0) - dist.amount);
+      sup.updated_at = Date.now();
+      delete sup._synced_at;
       suppliers[inv.supplier_id] = sup;
       LocalStore.set('suppliers', suppliers);
     }

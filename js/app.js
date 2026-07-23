@@ -3,6 +3,34 @@
 // ==========================================================
 
 // ==========================================================
+// 🔧 Migration: إضافة طرق الدفع الجديدة (بنك، شيك)
+// ==========================================================
+(function migratePaymentMethods() {
+  if (typeof LocalStore === 'undefined' || typeof DEFAULT_PAYMENT_METHODS === 'undefined') return;
+
+  try {
+    const methods = LocalStore.get('settings/payment_methods');
+    if (!methods) return; // لسه ما اتضبطش، هيتم تعبئتها من DEFAULT تلقائياً
+
+    let migrated = false;
+    Object.keys(DEFAULT_PAYMENT_METHODS).forEach(key => {
+      if (!methods.hasOwnProperty(key)) {
+        methods[key] = { ...DEFAULT_PAYMENT_METHODS[key] };
+        migrated = true;
+        console.log(`✅ Migration: أضيفت طريقة دفع ${methods[key].label}`);
+      }
+    });
+
+    if (migrated) {
+      LocalStore.set('settings/payment_methods', methods);
+      console.log('✅ Payment methods migration completed');
+    }
+  } catch(e) {
+    console.warn('Payment methods migration failed:', e);
+  }
+})();
+
+// ==========================================================
 // 🔧 Migration: تحديث الفواتير القديمة اللي عليها مرتجعات
 // (إضافة inv.total_returned + تصحيح inv.paid للـ cash refunds القديمة)
 // ==========================================================

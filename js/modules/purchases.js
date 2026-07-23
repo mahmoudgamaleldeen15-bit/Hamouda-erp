@@ -592,6 +592,7 @@ const PurchasesModule = {
       created_by: currentUser._id,
       created_by_name: currentUser.name,
       created_at: Date.now(),
+      updated_at: Date.now(),
       notes: notes
     };
 

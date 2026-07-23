@@ -203,7 +203,7 @@ const SettingsModule = {
 
     const methods = LocalStore.get('settings/payment_methods') || DEFAULT_PAYMENT_METHODS;
 
-    // ✅ Migration: لو الـ structure قديم، عبيه بالجديد
+    // ✅ Migration 1: لو الـ structure قديم، عبيه بالجديد
     let migrated = false;
     Object.keys(methods).forEach(key => {
       if (!methods[key].hasOwnProperty('requires_transfer')) {
@@ -220,6 +220,16 @@ const SettingsModule = {
         migrated = true;
       }
     });
+
+    // ✅ Migration 2: أضف الطرق الجديدة اللي مش موجودة (بنك، شيك، إلخ)
+    Object.keys(DEFAULT_PAYMENT_METHODS).forEach(key => {
+      if (!methods.hasOwnProperty(key)) {
+        methods[key] = { ...DEFAULT_PAYMENT_METHODS[key] };
+        migrated = true;
+        console.log(`✅ أضيفت طريقة دفع جديدة: ${methods[key].label}`);
+      }
+    });
+
     if (migrated) LocalStore.set('settings/payment_methods', methods);
 
     return `
