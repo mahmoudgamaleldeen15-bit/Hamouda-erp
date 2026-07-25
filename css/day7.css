@@ -834,3 +834,143 @@ body.install-not-available .install-banner {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ==========================================================
+   🖨️ Print Styles - إصلاح طباعة التقارير والصفحات
+   ========================================================== */
+@media print {
+  /* أخفي الـ sidebar والـ navbar */
+  #sidebar, .navbar, .nav-actions, .sidebar-header {
+    display: none !important;
+  }
+
+  /* الـ main content ياخد كامل الصفحة */
+  .main-content {
+    margin: 0 !important;
+    padding: 10mm !important;
+    width: 100% !important;
+  }
+
+  /* أخفي كل الـ buttons والفلاتر */
+  .no-print,
+  .page-actions,
+  .btn,
+  .filter-bar,
+  button {
+    display: none !important;
+  }
+
+  /* الـ report container يبان كامل */
+  #moduleContainer {
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* الجداول تبان كاملة بدون scroll */
+  .table-container {
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: 1px solid #333 !important;
+  }
+
+  .table-container::after,
+  .table-container::before {
+    display: none !important;
+  }
+
+  table {
+    min-width: 100% !important;
+    width: 100% !important;
+  }
+
+  th, td {
+    padding: 6px 8px !important;
+    font-size: 11px !important;
+    border: 1px solid #666 !important;
+  }
+
+  th {
+    background: #F3F4F6 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Cards واضحة */
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #E5E7EB !important;
+    page-break-inside: avoid;
+  }
+
+  /* Grid layouts للطباعة */
+  .grid-4, .grid-3 {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .grid-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Stats compact */
+  .stat-card {
+    padding: 8px !important;
+  }
+
+  .stat-value {
+    font-size: 16px !important;
+  }
+
+  .stat-label {
+    font-size: 10px !important;
+  }
+
+  /* Page header للطباعة */
+  .page-header {
+    border-bottom: 2px solid #333 !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .page-title {
+    font-size: 20px !important;
+  }
+
+  /* منع break داخل row */
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* منع background dark */
+  * {
+    background-color: transparent !important;
+    color: #000 !important;
+  }
+
+  /* Header logo */
+  .report-print-header {
+    display: block !important;
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #333;
+  }
+
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}
+
+/* ==========================================================
+   🖨️ Invoice Print - يشتغل مع النظام الحالي
+   ========================================================== */
+@media print {
+  /* لو فيه .invoice-print، هو بس اللي يبان (لتفاصيل فاتورة معينة) */
+  body.printing-invoice #sidebar,
+  body.printing-invoice .navbar {
+    display: none !important;
+  }
+}

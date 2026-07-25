@@ -163,7 +163,7 @@ const ReturnsModule = {
       <tr onclick="ReturnsModule.viewDetail('${r._id}', '${r._type}')" style="cursor:pointer;">
         <td><strong>${r.return_number}</strong></td>
         <td>${typeBadge}</td>
-        <td>${fmtDate(r.created_at)}</td>
+        <td>${fmtDate(r.date || r.created_at)}</td>
         <td>${otherParty}</td>
         <td>${wh.name}</td>
         <td>${r.original_invoice_number || '—'}</td>
@@ -359,11 +359,20 @@ const ReturnsModule = {
           <div><strong>${type === 'sales' ? 'العميل' : 'المورد'}:</strong> ${otherParty?.name || '—'}</div>
           <div><strong>التليفون:</strong> ${otherParty?.phone || '—'}</div>
           <div><strong>المخزن:</strong> ${wh.name}</div>
-          <div><strong>تاريخ الفاتورة:</strong> ${fmtDate(inv.created_at)}</div>
+          <div><strong>تاريخ الفاتورة:</strong> ${fmtDate(inv.date || inv.created_at)}</div>
           <div><strong>الإجمالي:</strong> ${fmtMoney(inv.grand_total)} ج.م</div>
           <div><strong>المدفوع:</strong> ${fmtMoney(inv.paid)} ج.م</div>
           <div><strong>المتبقي:</strong> ${fmtMoney(inv.remaining)} ج.م</div>
           <div><strong>الحالة:</strong> ${PurchasesModule.getStatusBadge(inv.status)}</div>
+        </div>
+      </div>
+
+      <!-- Return Date -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="form-group" style="margin: 0;">
+          <label>📅 تاريخ المرتجع *</label>
+          <input type="date" id="ret_date" value="${new Date().toISOString().slice(0,10)}" style="max-width:250px;">
+          <small class="hint">التاريخ ده هو اللي هيظهر في قوائم المرتجعات والتقارير</small>
         </div>
       </div>
 
@@ -644,6 +653,7 @@ const ReturnsModule = {
     }
 
     // ⭐ 2. Build return record
+    const returnDate = document.getElementById('ret_date')?.value || new Date().toISOString().slice(0, 10);
     const returnRecord = {
       _id: returnId,
       return_number: returnNumber,
@@ -651,6 +661,7 @@ const ReturnsModule = {
       original_invoice_id: inv._id,
       original_invoice_number: inv.invoice_number,
       warehouse_id: inv.warehouse_id,
+      date: returnDate,
       items: validItems.map(i => ({
         product_id: i.product_id,
         product_name_snapshot: i.product_name_snapshot,
@@ -666,7 +677,8 @@ const ReturnsModule = {
       notes: notes,
       created_by: currentUser._id,
       created_by_name: currentUser.name,
-      created_at: Date.now()
+      created_at: Date.now(),
+      updated_at: Date.now()
     };
 
     // Sales-specific
@@ -864,7 +876,7 @@ const ReturnsModule = {
           <div class="invoice-number-box" style="background: #FEE2E2; border-right-color: #DC2626;">
             <div class="invoice-label" style="color:#991B1B;">${typeLabel}</div>
             <div class="invoice-number" style="color:#991B1B;">${ret.return_number}</div>
-            <div class="invoice-date">${fmtDate(ret.created_at)}</div>
+            <div class="invoice-date">${fmtDate(ret.date || ret.created_at)}</div>
           </div>
         </div>
 

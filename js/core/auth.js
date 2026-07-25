@@ -103,6 +103,14 @@ function doLogin() {
   }
 
   const users = LocalStore.get('users') || {};
+
+  // ⭐ حماية إضافية: لو Users فاضية، ارجع لشاشة إنشاء الحساب
+  if (Object.keys(users).length === 0) {
+    console.log('⚠️ No users on login attempt - redirecting to firstRun');
+    showScreen('firstRunScreen');
+    return;
+  }
+
   const user = Object.values(users).find(u => u.username === username && u.active);
 
   if (!user) {

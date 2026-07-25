@@ -203,16 +203,12 @@
 }
 
 /* ========================================================== */
-/* PRINT STYLES */
+/* PRINT STYLES - للفواتير فقط */
 /* ========================================================== */
 @media print {
-  body * { visibility: hidden; }
-
-  .invoice-print, .invoice-print * { visibility: visible; }
-
+  /* هذا الـ style يطبق فقط لو الصفحة فيها invoice-print (فاتورة) */
   .invoice-print {
-    position: absolute;
-    top: 0; right: 0; left: 0;
+    position: relative;
     box-shadow: none;
     padding: 20px;
     max-width: 100%;

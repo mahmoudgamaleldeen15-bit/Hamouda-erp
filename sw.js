@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hamouda-erp-v3.3.1';
+const CACHE_NAME = 'hamouda-erp-v3.4.0';
 const ASSETS = [
   './', './index.html', './manifest.json',
   './assets/logo.png', './assets/logo-sm.png', './assets/mg-apphouse.png',

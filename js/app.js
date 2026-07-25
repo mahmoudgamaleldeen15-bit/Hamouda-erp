@@ -291,6 +291,15 @@ window.addEventListener('load', () => {
       }
 
       // العادي - Login
+      // ⭐ حماية إضافية: قبل ما نروح للـ Login، نتاكد إن فعلاً فيه Users
+      const usersCheck = LocalStore.get('users');
+      if (!usersCheck || Object.keys(usersCheck).length === 0) {
+        // مافيش Users - يبقى نروح لـ firstRunScreen حتى لو localStorage فيه حاجة تانية
+        console.log('⚠️ No users found - forcing firstRunScreen');
+        showScreen('firstRunScreen');
+        return;
+      }
+
       showScreen('loginScreen');
       document.getElementById('login_username').focus();
     }

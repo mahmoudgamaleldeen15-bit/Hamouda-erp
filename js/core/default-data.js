@@ -350,13 +350,24 @@ function getInvoiceNet(inv, type) {
   const paid = Number(inv.paid) || 0;
   const remaining = Math.max(0, netTotal - paid);
 
+  // ✅ حساب المسترد الفعلي (كاش رجع للعميل)
+  const cashRefunded = returns
+    .filter(r => r.refund_method === 'cash')
+    .reduce((sum, r) => sum + (r.total_returned || 0), 0);
+
+  // ✅ صافي المدفوع = المدفوع - المسترد كاش
+  const netPaid = Math.max(0, paid - cashRefunded);
+
   return {
     originalTotal,
     totalReturned,
     netTotal,
     paid,
     remaining,
+    cashRefunded,   // ✅ المبلغ الكاش اللي رجع
+    netPaid,        // ✅ صافي المدفوع بعد الاسترداد
     hasReturns: totalReturned > 0,
+    hasCashRefund: cashRefunded > 0,
     returnsCount: returns.length,
     returns
   };

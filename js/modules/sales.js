@@ -165,7 +165,7 @@ const SalesModule = {
         <tr onclick="SalesModule.viewInvoice('${inv._id}')"
             style="cursor:pointer; ${cancelled ? 'opacity:0.5; text-decoration:line-through;' : ''}">
           <td><strong>${inv.invoice_number}</strong></td>
-          <td>${fmtDate(inv.created_at)}</td>
+          <td>${fmtDate(inv.date || inv.created_at)}</td>
           <td>${cust.name}</td>
           <td>${productsSummary}</td>
           <td>${wh.name}</td>
@@ -894,7 +894,7 @@ const SalesModule = {
           <div class="invoice-number-box">
             <div class="invoice-label">فاتورة بيع</div>
             <div class="invoice-number">${inv.invoice_number}</div>
-            <div class="invoice-date">${fmtDate(inv.created_at)}</div>
+            <div class="invoice-date">${fmtDate(inv.date || inv.created_at)}</div>
           </div>
         </div>
 
@@ -983,6 +983,16 @@ const SalesModule = {
                   <span>المدفوع (${PurchasesModule.getPaymentFullDescription(inv)}):</span>
                   <span>${fmtMoney(net.paid)} ج.م</span>
                 </div>
+                ${net.hasCashRefund ? `
+                  <div class="invoice-total-row" style="color:#DC2626;">
+                    <span>💸 المسترد (كاش للعميل):</span>
+                    <span>- ${fmtMoney(net.cashRefunded)} ج.م</span>
+                  </div>
+                  <div class="invoice-total-row" style="background:#EFF6FF; padding:8px 12px; border-radius:6px;">
+                    <span><strong>💰 صافي المدفوع بعد الاسترداد:</strong></span>
+                    <span><strong>${fmtMoney(net.netPaid)} ج.م</strong></span>
+                  </div>
+                ` : ''}
                 <div class="invoice-total-row" style="color:${net.remaining > 0 ? 'var(--danger)' : 'var(--leaf-600)'};">
                   <span><strong>المتبقي:</strong></span>
                   <span><strong>${fmtMoney(net.remaining)} ج.م</strong></span>
@@ -1193,11 +1203,18 @@ ${itemsDetail}
 ${(() => {
   const _n = getInvoiceNet(inv, 'sales');
   if (_n.hasReturns) {
-    return `💰 الإجمالي الأصلي: ${fmtMoney(_n.originalTotal)} ج.م
+    let msg = `💰 الإجمالي الأصلي: ${fmtMoney(_n.originalTotal)} ج.م
 🔄 مرتجعات (${_n.returnsCount}): -${fmtMoney(_n.totalReturned)} ج.م
 💎 الصافي: *${fmtMoney(_n.netTotal)} ج.م*
-✅ المدفوع: ${fmtMoney(_n.paid)} ج.م (${PurchasesModule.getPaymentFullDescription(inv)})
+✅ المدفوع: ${fmtMoney(_n.paid)} ج.م (${PurchasesModule.getPaymentFullDescription(inv)})`;
+    if (_n.hasCashRefund) {
+      msg += `
+💸 المسترد للعميل: -${fmtMoney(_n.cashRefunded)} ج.م
+💰 صافي المدفوع بعد الاسترداد: *${fmtMoney(_n.netPaid)} ج.م*`;
+    }
+    msg += `
 🔴 المتبقي: *${fmtMoney(_n.remaining)} ج.م*`;
+    return msg;
   }
   return `💰 الإجمالي: *${fmtMoney(inv.grand_total)} ج.م*
 ✅ المدفوع: ${fmtMoney(inv.paid)} ج.م (${PurchasesModule.getPaymentFullDescription(inv)})
