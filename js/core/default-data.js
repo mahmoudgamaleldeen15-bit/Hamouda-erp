@@ -48,6 +48,7 @@ const DEFAULT_UNITS = [
   { id: "ton",    name: "طن",      active: true },
   { id: "box",    name: "كرتونة",  active: true },
   { id: "bag",    name: "شيكارة",  active: true },
+  { id: "plastic_bag", name: "كيس", active: true },
   { id: "barrel", name: "برميل",   active: true },
   { id: "liter",  name: "لتر",     active: true },
   { id: "gallon", name: "جالون",   active: true },

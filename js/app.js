@@ -31,6 +31,30 @@
 })();
 
 // ==========================================================
+// 🔧 Migration: إضافة وحدة "كيس" للأجهزة القديمة
+// (بس إضافة - مش بيغير أي وحدة موجودة)
+// ==========================================================
+(function migrateUnits() {
+  if (typeof LocalStore === 'undefined' || typeof DEFAULT_UNITS === 'undefined') return;
+
+  try {
+    const units = LocalStore.get('settings/units');
+    if (!units || !Array.isArray(units)) return; // لسه ما اتضبطت - هتترجع من DEFAULT
+
+    // فحص لو "كيس" موجودة بالفعل (بالاسم لأن الـ id ممكن يختلف)
+    const hasKees = units.some(u => u.name === 'كيس');
+    if (hasKees) return; // موجودة - سيبها
+
+    // أضف كيس بس (مش هنغير حاجة تانية)
+    units.push({ id: "plastic_bag", name: "كيس", active: true });
+    LocalStore.set('settings/units', units);
+    console.log('✅ Migration: وحدة "كيس" أضيفت');
+  } catch(e) {
+    console.warn('Units migration failed:', e);
+  }
+})();
+
+// ==========================================================
 // 🔧 Migration: تحديث الفواتير القديمة اللي عليها مرتجعات
 // (إضافة inv.total_returned + تصحيح inv.paid للـ cash refunds القديمة)
 // ==========================================================
