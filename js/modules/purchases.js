@@ -648,6 +648,10 @@ const PurchasesModule = {
     if (supplier) {
       supplier.cached_lifetime_purchases = (supplier.cached_lifetime_purchases || 0) + grand_total;
       supplier.cached_total_debt_to_them = (supplier.cached_total_debt_to_them || 0) + remaining;
+      // ✅ لازم نحدث updated_at ونمسح _synced_at عشان الرفع للسحابة يشتغل صح
+      // (من غيرها، التحديث ده ممكن يتجاهله نظام المزامنة ويرجع لقيمة قديمة)
+      supplier.updated_at = Date.now();
+      delete supplier._synced_at;
       suppliers[supplier_id] = supplier;
       LocalStore.set('suppliers', suppliers);
     }
@@ -878,6 +882,8 @@ const PurchasesModule = {
           })()}
         </div>
 
+        ${this.renderPaymentsBreakdown(inv)}
+
         ${inv.notes ? `
           <div class="invoice-notes">
             <strong>ملاحظات:</strong> ${inv.notes}
@@ -958,6 +964,53 @@ const PurchasesModule = {
     }
 
     return label;
+  },
+
+  // ==========================================================
+  // ✅ جديد: عرض تفصيلي لكل الدفعات لو الفاتورة اتسددت على أكتر من دفعة
+  // (مثلاً: جزء كاش + جزء حساب بنكي في عمليتين منفصلتين)
+  // يظهر بس لو فيه أكتر من دفعة واحدة - بدون أي تأثير على الفواتير العادية
+  // ==========================================================
+  renderPaymentsBreakdown(inv) {
+    if (!inv.payments || inv.payments.length <= 1) return '';
+
+    const rows = inv.payments.map(p => `
+      <tr>
+        <td style="font-size:13px;">${fmtDate(p.date) || '—'}</td>
+        <td style="font-size:13px; color:var(--gray-500);">${p.recorded_at ? fmtDateTime(p.recorded_at) : '—'}</td>
+        <td style="font-size:13px;">${getPaymentMethodFullLabel(p)}</td>
+        <td style="font-size:13px; font-weight:700; color:var(--leaf-700);">${fmtMoney(p.amount)} ج.م</td>
+      </tr>
+    `).join('');
+
+    const totalPaid = inv.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    return `
+      <div class="card no-print" style="margin-top:12px; margin-bottom:0;">
+        <div class="card-header">
+          <div class="card-title" style="font-size:14px;">💳 تفاصيل الدفعات (${inv.payments.length})</div>
+        </div>
+        <div class="table-container" style="box-shadow:none; border:none;">
+          <table>
+            <thead>
+              <tr>
+                <th style="font-size:12px;">تاريخ الدفعة</th>
+                <th style="font-size:12px;">وقت التسجيل</th>
+                <th style="font-size:12px;">طريقة الدفع</th>
+                <th style="font-size:12px;">المبلغ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+              <tr style="background:var(--gray-50); font-weight:800;">
+                <td colspan="3">الإجمالي المدفوع</td>
+                <td style="color:var(--leaf-700);">${fmtMoney(totalPaid)} ج.م</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
   },
 
   // ==========================================================
@@ -1116,6 +1169,9 @@ ${inv.notes ? '\n📝 ملاحظات: ' + inv.notes : ''}`;
     if (sup) {
       sup.cached_lifetime_purchases = Math.max(0, (sup.cached_lifetime_purchases || 0) - inv.grand_total);
       sup.cached_total_debt_to_them = Math.max(0, (sup.cached_total_debt_to_them || 0) - inv.remaining);
+      // ✅ نفس الإصلاح - updated_at لازم يتحدث عشان الرفع للسحابة يشتغل
+      sup.updated_at = Date.now();
+      delete sup._synced_at;
       suppliers[inv.supplier_id] = sup;
       LocalStore.set('suppliers', suppliers);
     }

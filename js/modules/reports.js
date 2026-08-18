@@ -80,6 +80,28 @@ const ReportsModule = {
           </div>
         ` : ''}
 
+        ${hasPermission('reports_debtors') ? `
+          <div class="report-card" onclick="ReportsModule.openReport('collections')">
+            <div class="report-icon" style="background:#D1FAE5;">📥</div>
+            <div class="report-info">
+              <div class="report-title">كشف تحصيلات العملاء</div>
+              <div class="report-desc">كل المدفوعات المُحصّلة بالتاريخ والوقت وطريقة السداد</div>
+            </div>
+            <div class="report-arrow">←</div>
+          </div>
+        ` : ''}
+
+        ${hasPermission('reports_purchases') ? `
+          <div class="report-card" onclick="ReportsModule.openReport('supplier_payments')">
+            <div class="report-icon" style="background:#DBEAFE;">📤</div>
+            <div class="report-info">
+              <div class="report-title">كشف مدفوعات الموردين</div>
+              <div class="report-desc">كل المبالغ المدفوعة للموردين بالتاريخ والوقت وطريقة السداد</div>
+            </div>
+            <div class="report-arrow">←</div>
+          </div>
+        ` : ''}
+
         ${hasPermission('reports_profit') ? `
           <div class="report-card" onclick="ReportsModule.openReport('profit')">
             <div class="report-icon" style="background:#EDE9FE;">💎</div>
@@ -301,6 +323,8 @@ const ReportsModule = {
       case 'purchases': return this.renderPurchasesReport();
       case 'inventory': return this.renderInventoryReport();
       case 'debtors': return this.renderDebtorsReport();
+      case 'collections': return this.renderCollectionsReport();
+      case 'supplier_payments': return this.renderSupplierPaymentsReport();
       case 'profit': return this.renderProfitReport();
       default: return this.renderHome();
     }
@@ -984,7 +1008,311 @@ const ReportsModule = {
   },
 
   // ==========================================================
-  // 5. تقرير الأرباح
+  // 5. كشف تحصيلات العملاء (كل المبالغ المُحصّلة من العملاء)
+  // ==========================================================
+  getCollectionsData() {
+    const payments = Object.values(LocalStore.get('payments') || {})
+      .filter(p => {
+        // بس دفعات العملاء (تحصيل) - مش الاستردادات (sales_refund)
+        if (p.type !== 'sales_payment') return false;
+        if (this.filters.dateFrom && p.created_at < this.filters.dateFrom) return false;
+        if (this.filters.dateTo && p.created_at > this.filters.dateTo) return false;
+        if (this.filters.customerId !== 'all' && p.customer_id !== this.filters.customerId) return false;
+        return true;
+      })
+      .sort((a, b) => b.created_at - a.created_at);
+
+    return payments;
+  },
+
+  renderCollectionsReport() {
+    const container = document.getElementById('moduleContainer');
+    const payments = this.getCollectionsData();
+    const customers = LocalStore.get('customers') || {};
+    const users = LocalStore.get('users') || {};
+
+    const totalCollected = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    // تجميع حسب طريقة الدفع
+    const byMethod = {};
+    payments.forEach(p => {
+      const key = p.method || 'cash';
+      if (!byMethod[key]) byMethod[key] = { count: 0, total: 0 };
+      byMethod[key].count++;
+      byMethod[key].total += Number(p.amount) || 0;
+    });
+
+    // تجميع حسب العميل
+    const byCustomer = {};
+    payments.forEach(p => {
+      const cid = p.customer_id || '—';
+      if (!byCustomer[cid]) byCustomer[cid] = { count: 0, total: 0, name: customers[cid]?.name || p.customer_id || 'غير معروف' };
+      byCustomer[cid].count++;
+      byCustomer[cid].total += Number(p.amount) || 0;
+    });
+    const customersList = Object.entries(byCustomer).sort((a, b) => b[1].total - a[1].total);
+
+    const methodsMeta = LocalStore.get('settings/payment_methods') || DEFAULT_PAYMENT_METHODS;
+
+    container.innerHTML = `
+      ${this.renderActionsBar('collections')}
+
+      <div class="page-header no-print">
+        <div>
+          <div class="page-title">📥 كشف تحصيلات العملاء</div>
+          <div class="page-subtitle">كل المبالغ المحصّلة من العملاء بالتاريخ والوقت وطريقة السداد</div>
+        </div>
+      </div>
+
+      <div class="report-print-header" style="display:none;">
+        ${this.renderPrintHeader('📥 كشف تحصيلات العملاء')}
+      </div>
+
+      ${this.renderFilterBar({ showWarehouse: false, showCustomer: true })}
+
+      <!-- Summary -->
+      <div class="grid grid-3" style="margin-bottom: 16px;">
+        <div class="stat-card">
+          <div class="stat-label">🧾 عدد عمليات التحصيل</div>
+          <div class="stat-value">${payments.length}</div>
+        </div>
+        <div class="stat-card stat-green">
+          <div class="stat-label">💰 إجمالي المحصّل</div>
+          <div class="stat-value">${fmtMoney(totalCollected)} <span class="stat-currency">ج.م</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">👥 عدد العملاء</div>
+          <div class="stat-value">${customersList.length}</div>
+        </div>
+      </div>
+
+      <!-- توزيع حسب طريقة الدفع -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="card-header">
+          <div class="card-title">💳 توزيع التحصيلات حسب طريقة الدفع</div>
+        </div>
+        <div class="grid grid-4">
+          ${Object.entries(byMethod).length === 0 ? `
+            <div style="grid-column:1/-1; text-align:center; padding:20px; color:var(--gray-500);">لا توجد تحصيلات في الفترة المحددة</div>
+          ` : Object.entries(byMethod).sort((a, b) => b[1].total - a[1].total).map(([method, data]) => {
+            const m = methodsMeta[method];
+            const label = method === 'none' ? 'آجل' : `${m?.icon || ''} ${m?.label || method}`.trim();
+            return `
+              <div style="padding:12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius);">
+                <div style="font-weight:700;">${label}</div>
+                <div style="font-size:18px; font-weight:800; color:var(--leaf-700); margin-top:4px;">${fmtMoney(data.total)} ج.م</div>
+                <div style="font-size:12px; color:var(--gray-500);">${data.count} عملية</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- جدول تفصيلي لكل عملية تحصيل -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📋 تفاصيل عمليات التحصيل (${payments.length})</div>
+        </div>
+        <div class="table-container" style="box-shadow:none; border:none;">
+          <table>
+            <thead>
+              <tr>
+                <th>تاريخ الدفعة</th>
+                <th>وقت التسجيل</th>
+                <th>العميل</th>
+                <th>رقم الفاتورة</th>
+                <th>طريقة السداد</th>
+                <th>استلم بواسطة</th>
+                <th>المبلغ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${payments.length === 0 ? `
+                <tr><td colspan="7" style="text-align:center; padding:30px; color:var(--gray-500);">لا توجد تحصيلات في الفترة المحددة</td></tr>
+              ` : payments.map(p => {
+                const cust = customers[p.customer_id];
+                const receivedBy = users[p.received_by]?.name || '—';
+                return `
+                  <tr onclick="${p.invoice_id ? `SalesModule.viewInvoice('${p.invoice_id}'); switchModule('sales');` : ''}" style="${p.invoice_id ? 'cursor:pointer;' : ''}">
+                    <td>${fmtDate(p.date) || fmtDate(p.created_at)}</td>
+                    <td style="color:var(--gray-500); font-size:13px;">${fmtDateTime(p.created_at)}</td>
+                    <td><strong>${cust?.name || 'غير معروف'}</strong></td>
+                    <td>${p.invoice_number || '—'}</td>
+                    <td>${getPaymentMethodFullLabel(p)}</td>
+                    <td style="font-size:13px;">${receivedBy}</td>
+                    <td><strong style="color:var(--leaf-700);">${fmtMoney(p.amount)} ج.م</strong></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+            ${payments.length > 0 ? `
+              <tfoot>
+                <tr style="background:var(--gray-50); font-weight:800;">
+                  <td colspan="6">الإجمالي</td>
+                  <td style="color:var(--leaf-700);">${fmtMoney(totalCollected)} ج.م</td>
+                </tr>
+              </tfoot>
+            ` : ''}
+          </table>
+        </div>
+      </div>
+    `;
+  },
+
+  // ==========================================================
+  // 6. كشف مدفوعات الموردين (كل المبالغ المدفوعة للموردين)
+  // ==========================================================
+  getSupplierPaymentsData() {
+    const payments = Object.values(LocalStore.get('payments') || {})
+      .filter(p => {
+        // بس دفعات الموردين - مش الاستردادات (purchase_refund)
+        if (p.type !== 'purchase_payment') return false;
+        if (this.filters.dateFrom && p.created_at < this.filters.dateFrom) return false;
+        if (this.filters.dateTo && p.created_at > this.filters.dateTo) return false;
+        if (this.filters.supplierId !== 'all' && p.supplier_id !== this.filters.supplierId) return false;
+        return true;
+      })
+      .sort((a, b) => b.created_at - a.created_at);
+
+    return payments;
+  },
+
+  renderSupplierPaymentsReport() {
+    const container = document.getElementById('moduleContainer');
+    const payments = this.getSupplierPaymentsData();
+    const suppliers = LocalStore.get('suppliers') || {};
+    const users = LocalStore.get('users') || {};
+
+    const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    // تجميع حسب طريقة الدفع
+    const byMethod = {};
+    payments.forEach(p => {
+      const key = p.method || 'cash';
+      if (!byMethod[key]) byMethod[key] = { count: 0, total: 0 };
+      byMethod[key].count++;
+      byMethod[key].total += Number(p.amount) || 0;
+    });
+
+    // تجميع حسب المورد
+    const bySupplier = {};
+    payments.forEach(p => {
+      const sid = p.supplier_id || '—';
+      if (!bySupplier[sid]) bySupplier[sid] = { count: 0, total: 0, name: suppliers[sid]?.name || p.supplier_id || 'غير معروف' };
+      bySupplier[sid].count++;
+      bySupplier[sid].total += Number(p.amount) || 0;
+    });
+    const suppliersList = Object.entries(bySupplier).sort((a, b) => b[1].total - a[1].total);
+
+    const methodsMeta = LocalStore.get('settings/payment_methods') || DEFAULT_PAYMENT_METHODS;
+
+    container.innerHTML = `
+      ${this.renderActionsBar('supplier_payments')}
+
+      <div class="page-header no-print">
+        <div>
+          <div class="page-title">📤 كشف مدفوعات الموردين</div>
+          <div class="page-subtitle">كل المبالغ المدفوعة للموردين بالتاريخ والوقت وطريقة السداد</div>
+        </div>
+      </div>
+
+      <div class="report-print-header" style="display:none;">
+        ${this.renderPrintHeader('📤 كشف مدفوعات الموردين')}
+      </div>
+
+      ${this.renderFilterBar({ showWarehouse: false, showSupplier: true })}
+
+      <!-- Summary -->
+      <div class="grid grid-3" style="margin-bottom: 16px;">
+        <div class="stat-card">
+          <div class="stat-label">🧾 عدد عمليات السداد</div>
+          <div class="stat-value">${payments.length}</div>
+        </div>
+        <div class="stat-card stat-blue">
+          <div class="stat-label">💵 إجمالي المدفوع</div>
+          <div class="stat-value">${fmtMoney(totalPaid)} <span class="stat-currency">ج.م</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">🏭 عدد الموردين</div>
+          <div class="stat-value">${suppliersList.length}</div>
+        </div>
+      </div>
+
+      <!-- توزيع حسب طريقة الدفع -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="card-header">
+          <div class="card-title">💳 توزيع المدفوعات حسب طريقة الدفع</div>
+        </div>
+        <div class="grid grid-4">
+          ${Object.entries(byMethod).length === 0 ? `
+            <div style="grid-column:1/-1; text-align:center; padding:20px; color:var(--gray-500);">لا توجد مدفوعات في الفترة المحددة</div>
+          ` : Object.entries(byMethod).sort((a, b) => b[1].total - a[1].total).map(([method, data]) => {
+            const m = methodsMeta[method];
+            const label = method === 'none' ? 'آجل' : `${m?.icon || ''} ${m?.label || method}`.trim();
+            return `
+              <div style="padding:12px; background:white; border:1px solid var(--gray-200); border-radius:var(--radius);">
+                <div style="font-weight:700;">${label}</div>
+                <div style="font-size:18px; font-weight:800; color:#2563EB; margin-top:4px;">${fmtMoney(data.total)} ج.م</div>
+                <div style="font-size:12px; color:var(--gray-500);">${data.count} عملية</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- جدول تفصيلي لكل عملية دفع -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📋 تفاصيل عمليات السداد (${payments.length})</div>
+        </div>
+        <div class="table-container" style="box-shadow:none; border:none;">
+          <table>
+            <thead>
+              <tr>
+                <th>تاريخ الدفعة</th>
+                <th>وقت التسجيل</th>
+                <th>المورد</th>
+                <th>رقم الفاتورة</th>
+                <th>طريقة السداد</th>
+                <th>دفع بواسطة</th>
+                <th>المبلغ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${payments.length === 0 ? `
+                <tr><td colspan="7" style="text-align:center; padding:30px; color:var(--gray-500);">لا توجد مدفوعات في الفترة المحددة</td></tr>
+              ` : payments.map(p => {
+                const sup = suppliers[p.supplier_id];
+                const paidBy = users[p.paid_by]?.name || '—';
+                return `
+                  <tr onclick="${p.invoice_id ? `PurchasesModule.viewInvoice('${p.invoice_id}'); switchModule('purchases');` : ''}" style="${p.invoice_id ? 'cursor:pointer;' : ''}">
+                    <td>${fmtDate(p.date) || fmtDate(p.created_at)}</td>
+                    <td style="color:var(--gray-500); font-size:13px;">${fmtDateTime(p.created_at)}</td>
+                    <td><strong>${sup?.name || 'غير معروف'}</strong></td>
+                    <td>${p.invoice_number || '—'}</td>
+                    <td>${getPaymentMethodFullLabel(p)}</td>
+                    <td style="font-size:13px;">${paidBy}</td>
+                    <td><strong style="color:#2563EB;">${fmtMoney(p.amount)} ج.م</strong></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+            ${payments.length > 0 ? `
+              <tfoot>
+                <tr style="background:var(--gray-50); font-weight:800;">
+                  <td colspan="6">الإجمالي</td>
+                  <td style="color:#2563EB;">${fmtMoney(totalPaid)} ج.م</td>
+                </tr>
+              </tfoot>
+            ` : ''}
+          </table>
+        </div>
+      </div>
+    `;
+  },
+
+  // ==========================================================
+  // 7. تقرير الأرباح
   // ==========================================================
   renderProfitReport() {
     const container = document.getElementById('moduleContainer');
@@ -1185,6 +1513,30 @@ const ReportsModule = {
       });
       filename = 'debtors_report';
     }
+    else if (reportType === 'collections') {
+      const payments = this.getCollectionsData();
+      const customers = LocalStore.get('customers') || {};
+      const users = LocalStore.get('users') || {};
+      csv = 'تاريخ الدفعة,وقت التسجيل,العميل,رقم الفاتورة,طريقة السداد,استلم بواسطة,المبلغ\n';
+      payments.forEach(p => {
+        const cust = customers[p.customer_id];
+        const receivedBy = users[p.received_by]?.name || '—';
+        csv += `"${fmtDate(p.date) || fmtDate(p.created_at)}","${fmtDateTime(p.created_at)}","${cust?.name || 'غير معروف'}","${p.invoice_number || ''}","${getPaymentMethodFullLabel(p).replace(/"/g, "'")}","${receivedBy}",${p.amount}\n`;
+      });
+      filename = 'customer_collections_report';
+    }
+    else if (reportType === 'supplier_payments') {
+      const payments = this.getSupplierPaymentsData();
+      const suppliers = LocalStore.get('suppliers') || {};
+      const users = LocalStore.get('users') || {};
+      csv = 'تاريخ الدفعة,وقت التسجيل,المورد,رقم الفاتورة,طريقة السداد,دفع بواسطة,المبلغ\n';
+      payments.forEach(p => {
+        const sup = suppliers[p.supplier_id];
+        const paidBy = users[p.paid_by]?.name || '—';
+        csv += `"${fmtDate(p.date) || fmtDate(p.created_at)}","${fmtDateTime(p.created_at)}","${sup?.name || 'غير معروف'}","${p.invoice_number || ''}","${getPaymentMethodFullLabel(p).replace(/"/g, "'")}","${paidBy}",${p.amount}\n`;
+      });
+      filename = 'supplier_payments_report';
+    }
     else if (reportType === 'profit') {
       const invoices = this.getSalesData();
       csv = 'الصنف,الكمية,الوحدة,الإيرادات,التكلفة,الربح,الهامش\n';
@@ -1312,6 +1664,50 @@ const ReportsModule = {
 
           msg = `🔴 *تقرير المدينين*\n━━━━━━━━━━━━━━\n⏰ ${fmtDateTime(Date.now())}\n━━━━━━━━━━━━━━\n\n📄 فواتير مستحقة: *${outstanding.length}*\n💰 إجمالي المديونية: *${fmtMoney(total)} ج.م*\n\n⚠️ متأخر: *${fmtMoney(overdueTotal)} ج.م* (${overdue.length} فاتورة)\n🟣 حرج (>30 يوم): *${fmtMoney(criticalTotal)} ج.م* (${critical.length} فاتورة)\n\n━━━━━━━━━━━━━━\n👤 من: ${currentUser.name}`;
         } catch(e) { console.error('debtors msg err:', e); }
+      }
+      // ========== COLLECTIONS (تحصيلات العملاء) ==========
+      else if (reportType === 'collections') {
+        try {
+          const payments = this.getCollectionsData();
+          const total = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+          const byMethod = {};
+          payments.forEach(p => {
+            const key = p.method || 'cash';
+            byMethod[key] = (byMethod[key] || 0) + (Number(p.amount) || 0);
+          });
+          const methodsMeta = LocalStore.get('settings/payment_methods') || DEFAULT_PAYMENT_METHODS;
+          const methodsLines = Object.entries(byMethod)
+            .sort((a, b) => b[1] - a[1])
+            .map(([method, amt]) => {
+              const m = methodsMeta[method];
+              const label = method === 'none' ? 'آجل' : `${m?.icon || ''} ${m?.label || method}`.trim();
+              return `${label}: ${fmtMoney(amt)} ج.م`;
+            }).join('\n');
+
+          msg = `📥 *كشف تحصيلات العملاء*\n━━━━━━━━━━━━━━\n📅 من ${from} إلى ${to}\n━━━━━━━━━━━━━━\n\n🧾 عدد عمليات التحصيل: *${payments.length}*\n💰 إجمالي المحصّل: *${fmtMoney(total)} ج.م*\n\n💳 حسب طريقة الدفع:\n${methodsLines || '—'}\n\n━━━━━━━━━━━━━━\n👤 من: ${currentUser.name}\n⏰ ${fmtDateTime(Date.now())}`;
+        } catch(e) { console.error('collections msg err:', e); }
+      }
+      // ========== SUPPLIER PAYMENTS (مدفوعات الموردين) ==========
+      else if (reportType === 'supplier_payments') {
+        try {
+          const payments = this.getSupplierPaymentsData();
+          const total = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+          const byMethod = {};
+          payments.forEach(p => {
+            const key = p.method || 'cash';
+            byMethod[key] = (byMethod[key] || 0) + (Number(p.amount) || 0);
+          });
+          const methodsMeta = LocalStore.get('settings/payment_methods') || DEFAULT_PAYMENT_METHODS;
+          const methodsLines = Object.entries(byMethod)
+            .sort((a, b) => b[1] - a[1])
+            .map(([method, amt]) => {
+              const m = methodsMeta[method];
+              const label = method === 'none' ? 'آجل' : `${m?.icon || ''} ${m?.label || method}`.trim();
+              return `${label}: ${fmtMoney(amt)} ج.م`;
+            }).join('\n');
+
+          msg = `📤 *كشف مدفوعات الموردين*\n━━━━━━━━━━━━━━\n📅 من ${from} إلى ${to}\n━━━━━━━━━━━━━━\n\n🧾 عدد عمليات السداد: *${payments.length}*\n💵 إجمالي المدفوع: *${fmtMoney(total)} ج.م*\n\n💳 حسب طريقة الدفع:\n${methodsLines || '—'}\n\n━━━━━━━━━━━━━━\n👤 من: ${currentUser.name}\n⏰ ${fmtDateTime(Date.now())}`;
+        } catch(e) { console.error('supplier_payments msg err:', e); }
       }
       // ========== PROFIT ==========
       else if (reportType === 'profit') {

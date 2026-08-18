@@ -383,7 +383,57 @@ const BulkPaymentModule = {
     }
     const methods = LocalStore.get('settings/payment_methods') || DEFAULT_PAYMENT_METHODS;
     const method = methods[methodKey];
-    if (!method || !method.requires_transfer || !method.phone) {
+    if (!method || !method.requires_transfer) {
+      box.innerHTML = '';
+      return;
+    }
+
+    // 📄 شيك
+    if (method.is_cheque) {
+      box.innerHTML = `
+        <div style="padding:10px; background:#FEF3C7; border:1px solid #F59E0B; border-radius:6px; font-size:13px;">
+          <div style="font-weight:700; color:#92400E; margin-bottom:8px;">📄 بيانات الشيك</div>
+          <div class="grid grid-2" style="gap:8px;">
+            <div class="form-group" style="margin:0;">
+              <label style="font-size:12px;">🔢 رقم الشيك *</label>
+              <input type="text" id="bp_cheque_number" placeholder="رقم الشيك"
+                     style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:6px;">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label style="font-size:12px;">👤 اسم المستفيد</label>
+              <input type="text" id="bp_cheque_recipient" value="${method.recipient_name || ''}" placeholder="اسم المستفيد"
+                     style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:6px;">
+            </div>
+          </div>
+          <div class="form-group" style="margin:8px 0 0 0;">
+            <label style="font-size:12px;">📅 تاريخ استحقاق الشيك (اختياري)</label>
+            <input type="date" id="bp_cheque_due_date"
+                   style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:6px;">
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // 🏛️ حساب بنكي
+    if (method.is_bank) {
+      box.innerHTML = `
+        <div style="padding:10px; background:#F0FDF4; border:1px solid var(--leaf-400); border-radius:6px; font-size:13px;">
+          <div style="font-weight:700; color:var(--leaf-700); margin-bottom:6px;">🏛️ ${method.bank_name || 'حساب بنكي'}</div>
+          <div>🔢 <strong style="direction:ltr; display:inline-block;">${method.account_number || '—'}</strong></div>
+          <div>👤 ${method.recipient_name || '—'}</div>
+          <div class="form-group" style="margin:8px 0 0 0;">
+            <label style="font-size:12px;">📌 مرجع التحويل (اختياري)</label>
+            <input type="text" id="bp_bank_ref" placeholder="رقم مرجع التحويل"
+                   style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:6px;">
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // 🏦 المحافظ الإلكترونية (الأصلي زي ما هو)
+    if (!method.phone) {
       box.innerHTML = '';
       return;
     }
@@ -404,7 +454,21 @@ const BulkPaymentModule = {
     const date = document.getElementById('bp_date').value;
     const notes = document.getElementById('bp_notes').value.trim();
 
+    // ✅ جمع تفاصيل الشيك/البنك (لو موجودة في الفورم)
+    const extraDetails = {
+      cheque_number: document.getElementById('bp_cheque_number')?.value.trim() || '',
+      cheque_recipient: document.getElementById('bp_cheque_recipient')?.value.trim() || '',
+      cheque_due_date: document.getElementById('bp_cheque_due_date')?.value || '',
+      bank_reference: document.getElementById('bp_bank_ref')?.value.trim() || ''
+    };
+
     if (targetAmount <= 0) return showNotif('❌ المبلغ لازم أكبر من صفر', 'danger');
+
+    // ✅ فحص رقم الشيك مطلوب لو الطريقة شيك
+    const methods = LocalStore.get('settings/payment_methods') || DEFAULT_PAYMENT_METHODS;
+    if (methods[method]?.is_cheque && !extraDetails.cheque_number) {
+      return showNotif('❌ رقم الشيك مطلوب', 'danger');
+    }
 
     const distributedTotal = this.distribution.reduce((sum, d) => sum + d.amount, 0);
     const activeDistributions = this.distribution.filter(d => d.amount > 0);
@@ -433,9 +497,9 @@ const BulkPaymentModule = {
     activeDistributions.forEach(dist => {
       try {
         if (isCustomer) {
-          this._applyCustomerPayment(dist, method, date, notes, bulkRef);
+          this._applyCustomerPayment(dist, method, date, notes, bulkRef, extraDetails);
         } else {
-          this._applySupplierPayment(dist, method, date, notes, bulkRef);
+          this._applySupplierPayment(dist, method, date, notes, bulkRef, extraDetails);
         }
         successCount++;
       } catch (e) {
@@ -476,7 +540,7 @@ const BulkPaymentModule = {
     }
   },
 
-  _applyCustomerPayment(dist, method, date, notes, bulkRef) {
+  _applyCustomerPayment(dist, method, date, notes, bulkRef, extraDetails = {}) {
     const invoices = LocalStore.get('sales_invoices') || {};
     const inv = invoices[dist.invoice_id];
     if (!inv) throw new Error('Invoice not found');
@@ -499,6 +563,11 @@ const BulkPaymentModule = {
       received_by: currentUser._id,
       notes: notes || 'تحصيل شامل',
       bulk_reference: bulkRef,
+      // ✅ تفاصيل شيك/بنك (لو موجودة)
+      cheque_number: extraDetails.cheque_number || '',
+      cheque_recipient: extraDetails.cheque_recipient || '',
+      cheque_due_date: extraDetails.cheque_due_date || '',
+      bank_reference: extraDetails.bank_reference || '',
       created_at: Date.now()
     };
     LocalStore.set('payments', payments);
@@ -520,7 +589,12 @@ const BulkPaymentModule = {
       date: date,
       notes: notes || 'تحصيل شامل',
       recorded_at: Date.now(),
-      bulk_reference: bulkRef
+      bulk_reference: bulkRef,
+      // ✅ تفاصيل شيك/بنك
+      cheque_number: extraDetails.cheque_number || '',
+      cheque_recipient: extraDetails.cheque_recipient || '',
+      cheque_due_date: extraDetails.cheque_due_date || '',
+      bank_reference: extraDetails.bank_reference || ''
     });
 
     invoices[dist.invoice_id] = inv;
@@ -538,7 +612,7 @@ const BulkPaymentModule = {
     }
   },
 
-  _applySupplierPayment(dist, method, date, notes, bulkRef) {
+  _applySupplierPayment(dist, method, date, notes, bulkRef, extraDetails = {}) {
     const invoices = LocalStore.get('purchase_invoices') || {};
     const inv = invoices[dist.invoice_id];
     if (!inv) throw new Error('Invoice not found');
@@ -561,6 +635,11 @@ const BulkPaymentModule = {
       paid_by: currentUser._id,
       notes: notes || 'دفع شامل',
       bulk_reference: bulkRef,
+      // ✅ تفاصيل شيك/بنك (لو موجودة)
+      cheque_number: extraDetails.cheque_number || '',
+      cheque_recipient: extraDetails.cheque_recipient || '',
+      cheque_due_date: extraDetails.cheque_due_date || '',
+      bank_reference: extraDetails.bank_reference || '',
       created_at: Date.now()
     };
     LocalStore.set('payments', payments);
@@ -582,7 +661,12 @@ const BulkPaymentModule = {
       date: date,
       notes: notes || 'دفع شامل',
       recorded_at: Date.now(),
-      bulk_reference: bulkRef
+      bulk_reference: bulkRef,
+      // ✅ تفاصيل شيك/بنك
+      cheque_number: extraDetails.cheque_number || '',
+      cheque_recipient: extraDetails.cheque_recipient || '',
+      cheque_due_date: extraDetails.cheque_due_date || '',
+      bank_reference: extraDetails.bank_reference || ''
     });
 
     invoices[dist.invoice_id] = inv;

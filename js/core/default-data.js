@@ -456,3 +456,42 @@ function getCategories() {
   if (stored && Array.isArray(stored) && stored.length > 0) return stored;
   return DEFAULT_CATEGORIES;
 }
+
+// ==========================================================
+// ✅ Helper جديد: وصف كامل لسجل دفعة واحد (من payments{} أو inv.payments[])
+// يستخدم في: تفاصيل الفواتير + تقارير التحصيلات/المدفوعات
+// لا يغير أي بيانات - قراءة فقط (read-only)
+// ==========================================================
+function getPaymentMethodFullLabel(payment) {
+  if (!payment || !payment.method) return '—';
+
+  const methods = LocalStore.get('settings/payment_methods') || DEFAULT_PAYMENT_METHODS;
+  const method = payment.method;
+
+  if (method === 'none') return 'آجل';
+
+  const m = methods[method];
+  const label = m ? `${m.icon || ''} ${m.label}`.trim() : method;
+
+  // شيك: رقم + مستفيد + تاريخ استحقاق (لو موجودين)
+  if (method === 'cheque' && payment.cheque_number) {
+    let desc = `${label} رقم ${payment.cheque_number}`;
+    if (payment.cheque_recipient) desc += ` - ${payment.cheque_recipient}`;
+    if (payment.cheque_due_date) desc += ` (استحقاق: ${payment.cheque_due_date})`;
+    return desc;
+  }
+
+  // حساب بنكي: مرجع التحويل (لو موجود)
+  if (method === 'bank_account' && payment.bank_reference) {
+    return `${label} - مرجع: ${payment.bank_reference}`;
+  }
+
+  return label;
+}
+
+// ==========================================================
+// ✅ Helper جديد: هل الدفعة استرداد (مبلغ سالب - مرتجع كاش)؟
+// ==========================================================
+function isRefundPayment(payment) {
+  return payment && (payment.type === 'sales_refund' || payment.type === 'purchase_refund' || (payment.amount || 0) < 0);
+}

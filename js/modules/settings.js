@@ -2038,6 +2038,9 @@ ${styles}
       customers[cid].cached_total_debt = 0;
       customers[cid].cached_lifetime_sales = 0;
       customers[cid].cached_lifetime_returns = 0;
+      // ✅ لازم updated_at جديد عشان الرفع للسحابة يشتغل صح
+      customers[cid].updated_at = Date.now();
+      delete customers[cid]._synced_at;
     });
     LocalStore.set('customers', customers);
 
@@ -2045,6 +2048,9 @@ ${styles}
     Object.keys(suppliers).forEach(sid => {
       suppliers[sid].cached_total_debt_to_them = 0;
       suppliers[sid].cached_lifetime_purchases = 0;
+      // ✅ لازم updated_at جديد عشان الرفع للسحابة يشتغل صح
+      suppliers[sid].updated_at = Date.now();
+      delete suppliers[sid]._synced_at;
     });
     LocalStore.set('suppliers', suppliers);
 

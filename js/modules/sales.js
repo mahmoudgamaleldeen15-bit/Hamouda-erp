@@ -1016,6 +1016,8 @@ const SalesModule = {
           })()}
         </div>
 
+        ${PurchasesModule.renderPaymentsBreakdown(inv)}
+
         ${showProfit && inv.status !== 'cancelled' ? `
           <div class="no-print" style="padding: 12px 16px; background: #F0FDF4; border-radius: var(--radius); border-right: 4px solid var(--leaf-600); margin-bottom: 16px;">
             💎 <strong>ربح الفاتورة:</strong>
@@ -1295,6 +1297,9 @@ ${inv.notes ? '\n📝 ملاحظات: ' + inv.notes : ''}`;
     if (cust) {
       cust.cached_lifetime_sales = Math.max(0, (cust.cached_lifetime_sales || 0) - inv.grand_total);
       cust.cached_total_debt = Math.max(0, (cust.cached_total_debt || 0) - inv.remaining);
+      // ✅ لازم updated_at جديد عشان الرفع للسحابة يشتغل صح
+      cust.updated_at = Date.now();
+      delete cust._synced_at;
       customers[inv.customer_id] = cust;
       LocalStore.set('customers', customers);
     }

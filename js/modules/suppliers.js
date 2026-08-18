@@ -86,7 +86,7 @@ const SuppliersModule = {
               <th>الاسم</th>
               <th>التليفون</th>
               <th>المدينة</th>
-              <th>مستحق عليه/ا</th>
+              <th>المستحق له</th>
               <th>إجمالي المشتريات</th>
               <th>الحالة</th>
               <th></th>
@@ -161,6 +161,11 @@ const SuppliersModule = {
         </div>
         <div class="page-actions">
           <button class="btn btn-outline" onclick="SuppliersModule.backToList()">← رجوع</button>
+          ${currentUser.role === 'admin' ? `
+            <button class="btn btn-outline" onclick="SuppliersModule.recalculateBalance('${id}')" title="يعيد حساب الرصيد من واقع فواتير الشراء الفعلية">
+              🔄 إعادة حساب الرصيد
+            </button>
+          ` : ''}
           ${(s.cached_total_debt_to_them || 0) > 0 && currentUser.role === 'admin' ? `
             <button class="btn btn-lg" style="background:#2563EB; color:white;" onclick="BulkPaymentModule.openForSupplier('${id}')">
               💵 دفع شامل
@@ -191,7 +196,7 @@ const SuppliersModule = {
             <div class="card-title">💰 الحساب</div>
           </div>
           <div style="display:grid; gap:10px;">
-            <div><strong>💸 المستحق عليه/ا:</strong>
+            <div><strong>💸 المستحق للمورد:</strong>
               <span class="${(s.cached_total_debt_to_them || 0) > 0 ? 'negative' : ''}">
                 ${fmtMoney(s.cached_total_debt_to_them || 0)} ج.م
               </span>
@@ -447,7 +452,58 @@ const SuppliersModule = {
       s.cached_total_debt_to_them = (s.cached_total_debt_to_them || 0) + remaining;
     }
 
+    // ✅ لازم updated_at جديد عشان الرفع للسحابة يشتغل صح
+    s.updated_at = Date.now();
+    delete s._synced_at;
+
     suppliers[supplierId] = s;
     LocalStore.set('suppliers', suppliers);
+  },
+
+  // ==========================================================
+  // ✅ إعادة حساب الرصيد من واقع فواتير الشراء الفعلية
+  // (يستخدم لتصحيح أي فرق نتج عن مشاكل مزامنة قديمة - قراءة وإعادة بناء فقط)
+  // ==========================================================
+  recalculateBalance(supplierId) {
+    if (!confirm('🔄 هيتم إعادة حساب رصيد المورد من واقع فواتير الشراء الفعلية.\n\nده هيصحح أي فرق ناتج عن مشاكل مزامنة سابقة.\n\nمتأكد؟')) return;
+
+    const suppliers = LocalStore.get('suppliers') || {};
+    const s = suppliers[supplierId];
+    if (!s) return showNotif('❌ المورد غير موجود', 'danger');
+
+    const invoices = Object.values(LocalStore.get('purchase_invoices') || {})
+      .filter(inv => inv.supplier_id === supplierId && inv.status !== 'cancelled');
+
+    const correctLifetimePurchases = invoices.reduce((sum, inv) => sum + (Number(inv.grand_total) || 0), 0);
+    const correctDebt = invoices.reduce((sum, inv) => sum + (Number(inv.remaining) || 0), 0);
+
+    const oldLifetime = s.cached_lifetime_purchases || 0;
+    const oldDebt = s.cached_total_debt_to_them || 0;
+
+    s.cached_lifetime_purchases = correctLifetimePurchases;
+    s.cached_total_debt_to_them = correctDebt;
+    s.updated_at = Date.now();
+    delete s._synced_at;
+
+    suppliers[supplierId] = s;
+    LocalStore.set('suppliers', suppliers);
+
+    logActivity('recalculate_balance', 'suppliers', supplierId, s.name, {
+      old_lifetime_purchases: oldLifetime,
+      new_lifetime_purchases: correctLifetimePurchases,
+      old_debt: oldDebt,
+      new_debt: correctDebt
+    });
+
+    if (oldLifetime === correctLifetimePurchases && oldDebt === correctDebt) {
+      showNotif('✅ الرصيد كان صحيح بالفعل - مفيش فرق', 'success', 4000);
+    } else {
+      showNotif(
+        `✅ تم تصحيح الرصيد:\nإجمالي المشتريات: ${fmtMoney(oldLifetime)} ← ${fmtMoney(correctLifetimePurchases)}\nالمستحق: ${fmtMoney(oldDebt)} ← ${fmtMoney(correctDebt)}`,
+        'success', 6000
+      );
+    }
+
+    this.render();
   }
 };

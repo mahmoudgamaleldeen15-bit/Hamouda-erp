@@ -726,6 +726,10 @@ const ReturnsModule = {
       else if (inv.paid > 0 && inv.remaining > 0) inv.status = 'partial';
       else if (inv.paid === 0 && inv.remaining > 0) inv.status = 'unpaid';
 
+      // ✅ لازم updated_at جديد عشان الرفع للسحابة يشتغل صح
+      inv.updated_at = Date.now();
+      delete inv._synced_at;
+
       invoices[inv._id] = inv;
       LocalStore.set(storageKey, invoices);
     } else {
@@ -739,6 +743,9 @@ const ReturnsModule = {
         const cust = customers[inv.customer_id];
         if (cust) {
           cust.cached_total_debt = Math.max(0, (cust.cached_total_debt || 0) - totalReturned);
+          // ✅ لازم updated_at جديد عشان الرفع للسحابة يشتغل صح
+          cust.updated_at = Date.now();
+          delete cust._synced_at;
           customers[inv.customer_id] = cust;
           LocalStore.set('customers', customers);
         }
@@ -749,6 +756,9 @@ const ReturnsModule = {
         // إذا remaining=0 والفاتورة كانت مدفوعة جزئي → مدفوعة
         if (inv.remaining === 0 && inv.paid > 0) inv.status = 'paid';
         else if (inv.remaining < (inv.grand_total - inv.total_returned)) inv.status = 'partial';
+        // ✅ لازم updated_at جديد عشان الرفع للسحابة يشتغل صح
+        inv.updated_at = Date.now();
+        delete inv._synced_at;
         invoices[inv._id] = inv;
         LocalStore.set(storageKey, invoices);
 
@@ -759,6 +769,9 @@ const ReturnsModule = {
         const sup = suppliers[inv.supplier_id];
         if (sup) {
           sup.cached_total_debt_to_them = Math.max(0, (sup.cached_total_debt_to_them || 0) - totalReturned);
+          // ✅ لازم updated_at جديد عشان الرفع للسحابة يشتغل صح
+          sup.updated_at = Date.now();
+          delete sup._synced_at;
           suppliers[inv.supplier_id] = sup;
           LocalStore.set('suppliers', suppliers);
         }
@@ -766,6 +779,9 @@ const ReturnsModule = {
         inv.remaining = Math.max(0, inv.remaining - totalReturned);
         if (inv.remaining === 0 && inv.paid > 0) inv.status = 'paid';
         else if (inv.remaining < (inv.grand_total - inv.total_returned)) inv.status = 'partial';
+        // ✅ لازم updated_at جديد عشان الرفع للسحابة يشتغل صح
+        inv.updated_at = Date.now();
+        delete inv._synced_at;
         invoices[inv._id] = inv;
         LocalStore.set(storageKey, invoices);
 
@@ -790,6 +806,9 @@ const ReturnsModule = {
         // لا نقلل lifetime_sales لأنها stats تاريخية
         // بس نضيف field جديد
         cust.cached_lifetime_returns = (cust.cached_lifetime_returns || 0) + totalReturned;
+        // ✅ لازم updated_at جديد عشان الرفع للسحابة يشتغل صح
+        cust.updated_at = Date.now();
+        delete cust._synced_at;
         customers[inv.customer_id] = cust;
         LocalStore.set('customers', customers);
       }

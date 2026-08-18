@@ -236,7 +236,12 @@ const CustomersModule = {
         </div>
         <div class="page-actions">
           <button class="btn btn-outline" onclick="CustomersModule.backToList()">← رجوع</button>
-          ${(cust.cached_total_debt || 0) > 0 && (hasPermission('debtors_collect_payment') || currentUser.role === 'admin') ? `
+          ${currentUser.role === 'admin' ? `
+            <button class="btn btn-outline" onclick="CustomersModule.recalculateBalance('${id}')" title="يعيد حساب الرصيد من واقع فواتير البيع الفعلية">
+              🔄 إعادة حساب الرصيد
+            </button>
+          ` : ''}
+          ${(c.cached_total_debt || 0) > 0 && (hasPermission('debtors_collect_payment') || currentUser.role === 'admin') ? `
             <button class="btn btn-lg" style="background:#059669; color:white;" onclick="BulkPaymentModule.openForCustomer('${id}')">
               💰 تحصيل شامل
             </button>
@@ -606,7 +611,59 @@ const CustomersModule = {
       c.last_purchase_at = Date.now();
     }
 
+    // ✅ لازم updated_at جديد عشان الرفع للسحابة يشتغل صح
+    // (من غيرها، فاتورة تانية بعدها ممكن تحديثها يضيع مع المزامنة)
+    c.updated_at = Date.now();
+    delete c._synced_at;
+
     customers[customerId] = c;
     LocalStore.set('customers', customers);
+  },
+
+  // ==========================================================
+  // ✅ إعادة حساب الرصيد من واقع فواتير البيع الفعلية
+  // (يستخدم لتصحيح أي فرق نتج عن مشاكل مزامنة قديمة - قراءة وإعادة بناء فقط)
+  // ==========================================================
+  recalculateBalance(customerId) {
+    if (!confirm('🔄 هيتم إعادة حساب رصيد العميل من واقع فواتير البيع الفعلية.\n\nده هيصحح أي فرق ناتج عن مشاكل مزامنة سابقة.\n\nمتأكد؟')) return;
+
+    const customers = LocalStore.get('customers') || {};
+    const c = customers[customerId];
+    if (!c) return showNotif('❌ العميل غير موجود', 'danger');
+
+    const invoices = Object.values(LocalStore.get('sales_invoices') || {})
+      .filter(inv => inv.customer_id === customerId && inv.status !== 'cancelled');
+
+    const correctLifetimeSales = invoices.reduce((sum, inv) => sum + (Number(inv.grand_total) || 0), 0);
+    const correctDebt = invoices.reduce((sum, inv) => sum + (Number(inv.remaining) || 0), 0);
+
+    const oldLifetime = c.cached_lifetime_sales || 0;
+    const oldDebt = c.cached_total_debt || 0;
+
+    c.cached_lifetime_sales = correctLifetimeSales;
+    c.cached_total_debt = correctDebt;
+    c.updated_at = Date.now();
+    delete c._synced_at;
+
+    customers[customerId] = c;
+    LocalStore.set('customers', customers);
+
+    logActivity('recalculate_balance', 'customers', customerId, c.name, {
+      old_lifetime_sales: oldLifetime,
+      new_lifetime_sales: correctLifetimeSales,
+      old_debt: oldDebt,
+      new_debt: correctDebt
+    });
+
+    if (oldLifetime === correctLifetimeSales && oldDebt === correctDebt) {
+      showNotif('✅ الرصيد كان صحيح بالفعل - مفيش فرق', 'success', 4000);
+    } else {
+      showNotif(
+        `✅ تم تصحيح الرصيد:\nإجمالي المبيعات: ${fmtMoney(oldLifetime)} ← ${fmtMoney(correctLifetimeSales)}\nالمديونية: ${fmtMoney(oldDebt)} ← ${fmtMoney(correctDebt)}`,
+        'success', 6000
+      );
+    }
+
+    this.render();
   }
 };
