@@ -9,16 +9,20 @@ let sessionTimer = null;
 // First-Run Setup
 // ==========================================================
 function doFirstRunSetup() {
-  const username = document.getElementById('fr_username').value.trim();
+  const usernameRaw = document.getElementById('fr_username').value.trim();
   const password = document.getElementById('fr_password').value;
   const confirm  = document.getElementById('fr_password_confirm').value;
   const errorEl = document.getElementById('fr_error');
   errorEl.style.display = 'none';
 
   // Validation
-  if (!username) {
+  if (!usernameRaw) {
     return showFrError('اسم المستخدم مطلوب');
   }
+
+  // ✅ Username دائماً lowercase (لتفادي مشاكل حساسية الحروف)
+  const username = usernameRaw.toLowerCase();
+
   if (password.length < DEFAULT_SETTINGS.password_min_length) {
     return showFrError('كلمة السر على الأقل ' + DEFAULT_SETTINGS.password_min_length + ' حروف');
   }
@@ -91,16 +95,19 @@ function showFrError(msg) {
 // Login
 // ==========================================================
 function doLogin() {
-  const username = document.getElementById('login_username').value.trim();
+  const usernameRaw = document.getElementById('login_username').value.trim();
   const password = document.getElementById('login_password').value;
   const errorEl = document.getElementById('login_error');
   const lockedEl = document.getElementById('login_locked');
   errorEl.style.display = 'none';
   lockedEl.style.display = 'none';
 
-  if (!username || !password) {
+  if (!usernameRaw || !password) {
     return showLoginError('اسم المستخدم وكلمة السر مطلوبين');
   }
+
+  // ✅ Case-insensitive comparison
+  const username = usernameRaw.toLowerCase();
 
   const users = LocalStore.get('users') || {};
 
@@ -111,7 +118,10 @@ function doLogin() {
     return;
   }
 
-  const user = Object.values(users).find(u => u.username === username && u.active);
+  // ✅ فحص case-insensitive
+  const user = Object.values(users).find(u =>
+    u.username && u.username.toLowerCase() === username && u.active
+  );
 
   if (!user) {
     return showLoginError('اسم مستخدم أو كلمة سر غلط');
@@ -125,8 +135,11 @@ function doLogin() {
     return;
   }
 
-  // Check password
-  if (user.password_hash !== hashPassword(password)) {
+  // ✅ Check password (نجرب كذا صيغة: العادي + بدون مسافات)
+  const hashNormal = hashPassword(password);
+  const hashTrimmed = hashPassword(password.trim());
+
+  if (user.password_hash !== hashNormal && user.password_hash !== hashTrimmed) {
     user.failed_attempts = (user.failed_attempts || 0) + 1;
 
     if (user.failed_attempts >= DEFAULT_SETTINGS.max_failed_login_attempts) {
@@ -286,4 +299,46 @@ function logActivity(action, module, entityId, label, extra = {}) {
     ...extra
   };
   LocalStore.set('activity_log', log);
+}
+
+// ==========================================================
+// 🆘 Emergency Reset - لو الحاج نسي كلمة السر (أدمن واحد بس)
+// ==========================================================
+function emergencyResetSingleAdmin() {
+  const users = LocalStore.get('users') || {};
+  const userList = Object.values(users).filter(u => u.active !== false);
+
+  // لو فيه أكتر من user، مش نسمح لأن ده خطر
+  if (userList.length > 1) {
+    alert('⚠️ فيه أكتر من مستخدم على النظام.\n\nلأمانك، مش هينفع تعمل reset تلقائي.\n\nممكن تسجل دخول بأي مستخدم أدمن آخر، وتعدل الباس من الإعدادات.\n\nأو اعمل ضبط مصنع كامل من جهاز فيه أدمن مسجل دخول.');
+    return;
+  }
+
+  if (userList.length === 0) {
+    // مافيش users → روح لشاشة الإعداد
+    showScreen('firstRunScreen');
+    return;
+  }
+
+  // فيه أدمن واحد بس
+  const admin = userList[0];
+  const confirmMsg = `⚠️ إعادة تعيين حساب الأدمن الوحيد\n\nهيتم مسح الحساب الحالي (${admin.username}) وترجع لشاشة إنشاء الحساب.\n\n⚠️ ملاحظات مهمة:\n• كل البيانات الأخرى (فواتير، أصناف، عملاء...) هتفضل موجودة\n• هيتم بس مسح حساب المستخدم\n• هتحتاج تعمل حساب أدمن جديد\n\nتأكد إنك متأكد وعايز تكمل؟`;
+
+  if (!confirm(confirmMsg)) return;
+
+  // فحص إضافي - كلمة تأكيد
+  const confirmWord = prompt('اكتب "امسح الحساب" للتأكيد:');
+  if (confirmWord !== 'امسح الحساب') {
+    alert('❌ تم إلغاء العملية');
+    return;
+  }
+
+  // امسح الـ users بس (الباقي يفضل)
+  LocalStore.set('users', {});
+
+  // كمان امسح الـ current session
+  sessionStorage.clear();
+
+  alert('✅ تم مسح الحساب. هيتم إعادة تشغيل النظام لعمل حساب جديد.');
+  setTimeout(() => location.reload(), 500);
 }

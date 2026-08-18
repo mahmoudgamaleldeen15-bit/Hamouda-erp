@@ -261,12 +261,28 @@ const CloudSync = {
     });
 
     // فحص اللي اتمسح - موجود محلياً بس مش في السحابة
-    Object.keys(localData).forEach(key => {
-      if (!remoteData[key]) {
-        delete localData[key];
-        hasChanges = true;
-      }
-    });
+    // ⚠️ حماية خاصة للـ users - مش نمسح users محلية إلا لو فيه users في السحابة كمان
+    // (لو السحابة كلها فاضية، ده معناه إن الرفع لسه ما تمش، مش إن الأدمن اتمسح)
+    const shouldCheckDeletions = path !== 'users' || Object.keys(remoteData).length > 0;
+
+    if (shouldCheckDeletions) {
+      Object.keys(localData).forEach(key => {
+        if (!remoteData[key]) {
+          // فحص إضافي للـ users: مش نمسح user لسه اتعمل الآن (آخر ثانيتين)
+          if (path === 'users') {
+            const localItem = localData[key];
+            const createdAt = localItem?.created_at || 0;
+            const ageSeconds = (Date.now() - createdAt) / 1000;
+            if (ageSeconds < 30) {
+              console.log(`🛡️ Protected new user ${key} from deletion (age: ${ageSeconds.toFixed(1)}s)`);
+              return; // مش نمسح
+            }
+          }
+          delete localData[key];
+          hasChanges = true;
+        }
+      });
+    }
 
     if (hasChanges) {
       console.log(`☁️ ${path}: +${addedCount} ~${changedCount}`);
