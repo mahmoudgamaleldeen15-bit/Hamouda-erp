@@ -411,7 +411,8 @@ const PurchasesModule = {
       ItemHelper.renderCard(item, idx, {
         moduleName: 'PurchasesModule',
         showStock: false,          // في الشراء ما نحتاجش رصيد
-        priceLabel: 'سعر الكيلو (شراء)'
+        priceLabel: 'سعر الكيلو (شراء)',
+        allowWeightDiscount: true  // ✅ خصم نسبة على الميزان - متاح في المشتريات فقط
       })
     ).join('');
   },
@@ -1037,14 +1038,24 @@ const PurchasesModule = {
     const itemsDetail = inv.items.map((item, i) => {
       const unitInfo = getItemUnitInfo(item);
       let detail = `${i + 1}. ${item.product_name_snapshot}`;
+      // ✅ توضيح خصم الميزان لو موجود (شفافية - نفس السلوك القديم لو مفيش خصم)
+      const hasWeightDiscount = (item.weight_discount_pct || 0) > 0 && item.qty_before_weight_discount;
       if (item.unit_type === 'cartons') {
         if (unitInfo.isBala) {
           detail += `\n   📦 ${item.cartons_count} ${unitInfo.productUnit}`;
+        } else if (hasWeightDiscount) {
+          detail += `\n   📦 ${item.cartons_count} ${unitInfo.vesselName} × ${item.carton_weight} كجم = ${fmtMoney(item.qty_before_weight_discount)} كجم`;
+          detail += `\n   📉 خصم ميزان ${item.weight_discount_pct}% → الصافي: ${fmtMoney(item.qty)} كجم`;
         } else {
           detail += `\n   📦 ${item.cartons_count} ${unitInfo.vesselName} × ${item.carton_weight} كجم = ${fmtMoney(item.qty)} كجم`;
         }
       } else {
-        detail += `\n   ⚖️ سيارة ${item.car_number || '—'}: ${fmtMoney(item.qty)} كجم صافي`;
+        if (hasWeightDiscount) {
+          detail += `\n   ⚖️ سيارة ${item.car_number || '—'}: ${fmtMoney(item.qty_before_weight_discount)} كجم صافي الميزان`;
+          detail += `\n   📉 خصم ميزان ${item.weight_discount_pct}% → الصافي: ${fmtMoney(item.qty)} كجم`;
+        } else {
+          detail += `\n   ⚖️ سيارة ${item.car_number || '—'}: ${fmtMoney(item.qty)} كجم صافي`;
+        }
       }
       detail += `\n   💰 ${fmtMoney(item.unit_price)} ج.م/${unitInfo.unitLabel} = ${fmtMoney(item.total)} ج.م`;
       return detail;

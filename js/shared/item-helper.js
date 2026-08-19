@@ -20,6 +20,8 @@ const ItemHelper = {
       car_number: '',
       total_weight: 0,
       empty_weight: 0,
+      // ✅ خصم نسبة على الميزان (اختياري - فاضي = بدون أي تأثير)
+      weight_discount_pct: '',
       // Common
       qty: 0,                      // بالكيلو دائماً (للمخزون)
       unit_price: 0,               // سعر الكيلو
@@ -36,14 +38,25 @@ const ItemHelper = {
       if (cw === 0) {
         // وضع "بلا وزن" - كل كرتونة = وحدة (بدون ضرب في الوزن)
         // الحساب: عدد الكراتين × سعر الكيلو (السعر هنا سعر الكرتونة نفسها)
+        // ✅ ملحوظة: خصم الميزان مش منطقي هنا لأن مفيش وزن أصلاً - نفس السلوك القديم بدون تغيير
         item.qty = count;
         item.total = count * (Number(item.unit_price) || 0);
+        item.qty_before_weight_discount = 0;
         return item;
       }
       item.qty = count * cw;
     } else {
       item.qty = Math.max(0, (Number(item.total_weight) || 0) - (Number(item.empty_weight) || 0));
     }
+
+    // ✅ خصم نسبة على الميزان (اختياري بالكامل)
+    // لو الحقل فاضي/صفر → item.qty يفضل زي ما هو بالظبط (نفس السلوك القديم 100%)
+    item.qty_before_weight_discount = item.qty;
+    const weightDiscountPct = Number(item.weight_discount_pct) || 0;
+    if (weightDiscountPct > 0) {
+      item.qty = item.qty * (1 - Math.min(weightDiscountPct, 100) / 100);
+    }
+
     item.total = item.qty * (Number(item.unit_price) || 0);
     return item;
   },
@@ -54,7 +67,8 @@ const ItemHelper = {
       moduleName = 'SalesModule',       // SalesModule | PurchasesModule
       showStock = false,                // عرض الرصيد المتاح
       warehouseId = null,               // للحصول على الرصيد
-      priceLabel = 'سعر الكيلو'
+      priceLabel = 'سعر الكيلو',
+      allowWeightDiscount = false       // ✅ خصم نسبة الميزان (يتفعّل بس من المشتريات)
     } = options;
 
     const products = Object.values(LocalStore.get('products') || {}).filter(p => p.active !== false);
@@ -117,7 +131,7 @@ const ItemHelper = {
           `;
         })()}
 
-        ${item.unit_type === 'cartons' ? this.renderCartonsFields(item, idx, moduleName) : this.renderWeightFields(item, idx, moduleName)}
+        ${item.unit_type === 'cartons' ? this.renderCartonsFields(item, idx, moduleName, allowWeightDiscount) : this.renderWeightFields(item, idx, moduleName, allowWeightDiscount)}
 
         ${(() => {
           // ✅ الوحدة الأصلية للصنف (product.unit)
@@ -268,13 +282,25 @@ const ItemHelper = {
     const totalEl = card.querySelector('.js-item-total');
     if (totalEl) totalEl.textContent = fmtMoney(item.total || 0);
 
-    // صافي الميزان (لو ميزان)
+    // صافي الميزان (لو ميزان) - بعد الخصم لو موجود
     const netEl = card.querySelector('.js-item-net-weight');
     if (netEl) netEl.textContent = fmtMoney(item.qty || 0);
 
-    // إجمالي كيلو الكراتين (لو كرتونة عادي)
+    // إجمالي كيلو الكراتين (لو كرتونة عادي) - بعد الخصم لو موجود
     const cartonsKgEl = card.querySelector('.js-item-cartons-kg');
     if (cartonsKgEl) cartonsKgEl.textContent = fmtMoney(item.qty || 0);
+
+    // ✅ عرض "قبل الخصم" لو فيه نسبة خصم ميزان مطبقة
+    const weightDiscountPct = Number(item.weight_discount_pct) || 0;
+    const beforeQty = item.qty_before_weight_discount;
+    const netBeforeEl = card.querySelector('.js-item-net-weight-before');
+    if (netBeforeEl) {
+      netBeforeEl.textContent = (weightDiscountPct > 0 && beforeQty) ? `قبل الخصم: ${fmtMoney(beforeQty)} كجم` : '';
+    }
+    const cartonsBeforeEl = card.querySelector('.js-item-cartons-kg-before');
+    if (cartonsBeforeEl) {
+      cartonsBeforeEl.textContent = (weightDiscountPct > 0 && beforeQty) ? `قبل الخصم: ${fmtMoney(beforeQty)} كجم` : '';
+    }
 
     // ✅ تحديث تنبيه فرق السعر
     const priceAlertEl = card.querySelector('.js-price-alert');
@@ -299,7 +325,7 @@ const ItemHelper = {
   },
 
   // حقول الكرتونة (اسم الوعاء يتغير حسب وحدة الصنف: كرتونة/برميل/شيكارة/إلخ)
-  renderCartonsFields(item, idx, moduleName) {
+  renderCartonsFields(item, idx, moduleName, allowWeightDiscount = false) {
     // Detect current mode
     const cw = item.carton_weight;
     let mode = 'none';
@@ -321,6 +347,11 @@ const ItemHelper = {
       ? (Number(item.cartons_count) || 0)
       : (Number(item.cartons_count) || 0) * (Number(item.carton_weight) || 0);
 
+    // ✅ عرض الوزن بعد الخصم (لو مفعّل ومكتوب نسبة)
+    const discountPct = Number(item.weight_discount_pct) || 0;
+    const showDiscountResult = allowWeightDiscount && mode !== 'none' && discountPct > 0;
+    const afterDiscountKg = showDiscountResult ? cartonsInKg * (1 - Math.min(discountPct, 100) / 100) : cartonsInKg;
+
     return `
       <div class="unit-fields cartons-fields">
         <div class="grid grid-3">
@@ -340,10 +371,15 @@ const ItemHelper = {
           </div>
           ${mode !== 'none' ? `
             <div style="padding:10px; text-align:center; background:#EDE9FE; border-radius:var(--radius);">
-              <div style="font-size:11px; color:var(--gray-600);">إجمالي الكيلو</div>
+              <div style="font-size:11px; color:var(--gray-600);">${showDiscountResult ? 'إجمالي الكيلو بعد الخصم' : 'إجمالي الكيلو'}</div>
               <div style="font-size:16px; font-weight:800; color:var(--grape-700); margin-top:2px;">
-                <span class="js-item-cartons-kg">${fmtMoney(cartonsInKg)}</span> كجم
+                <span class="js-item-cartons-kg">${fmtMoney(afterDiscountKg)}</span> كجم
               </div>
+              ${showDiscountResult ? `
+                <div style="font-size:11px; color:var(--gray-500); margin-top:2px;" class="js-item-cartons-kg-before">
+                  قبل الخصم: ${fmtMoney(cartonsInKg)} كجم
+                </div>
+              ` : `<div style="font-size:11px; color:transparent; margin-top:2px;" class="js-item-cartons-kg-before"></div>`}
             </div>
           ` : `
             <div style="padding:10px; text-align:center; background:#FEF3C7; border-radius:var(--radius);">
@@ -365,13 +401,29 @@ const ItemHelper = {
             <small class="hint">أدخل وزن ال${finalVessel} الفعلي — بيتضرب في العدد × سعر الكيلو</small>
           </div>
         ` : ''}
+
+        ${allowWeightDiscount && mode !== 'none' ? `
+          <div class="form-group" style="margin-top:10px;">
+            <label>📉 خصم على الميزان % <span style="font-weight:400; color:var(--gray-500);">(اختياري)</span></label>
+            <input type="number" step="0.01" min="0" max="100" placeholder="مثل: 3 يعني خصم 3%"
+                   value="${item.weight_discount_pct || ''}"
+                   oninput="${moduleName}.updateItem(${idx}, 'weight_discount_pct', this.value)">
+            <small class="hint">نسبة تُخصم من إجمالي الكيلو (فقد/شوائب) — سيبها فاضية لو مفيش خصم</small>
+          </div>
+        ` : ''}
       </div>
     `;
   },
 
   // حقول الميزان
-  renderWeightFields(item, idx, moduleName) {
+  renderWeightFields(item, idx, moduleName, allowWeightDiscount = false) {
     const netWeight = Math.max(0, (Number(item.total_weight) || 0) - (Number(item.empty_weight) || 0));
+
+    // ✅ عرض الوزن بعد الخصم (لو مفعّل ومكتوب نسبة)
+    const discountPct = Number(item.weight_discount_pct) || 0;
+    const showDiscountResult = allowWeightDiscount && discountPct > 0;
+    const afterDiscountWeight = showDiscountResult ? netWeight * (1 - Math.min(discountPct, 100) / 100) : netWeight;
+
     return `
       <div class="unit-fields weight-fields">
         <div class="form-group" style="margin-bottom:10px;">
@@ -391,12 +443,27 @@ const ItemHelper = {
                    oninput="${moduleName}.updateItem(${idx}, 'empty_weight', this.value)">
           </div>
           <div style="padding:10px; text-align:center; background:#F0FDF4; border-radius:var(--radius);">
-            <div style="font-size:11px; color:var(--gray-600);">صافي الميزان</div>
+            <div style="font-size:11px; color:var(--gray-600);">${showDiscountResult ? 'صافي الميزان بعد الخصم' : 'صافي الميزان'}</div>
             <div style="font-size:16px; font-weight:800; color:var(--leaf-700); margin-top:2px;">
-              <span class="js-item-net-weight">${fmtMoney(netWeight)}</span> كجم
+              <span class="js-item-net-weight">${fmtMoney(afterDiscountWeight)}</span> كجم
             </div>
+            ${showDiscountResult ? `
+              <div style="font-size:11px; color:var(--gray-500); margin-top:2px;" class="js-item-net-weight-before">
+                قبل الخصم: ${fmtMoney(netWeight)} كجم
+              </div>
+            ` : `<div style="font-size:11px; color:transparent; margin-top:2px;" class="js-item-net-weight-before"></div>`}
           </div>
         </div>
+
+        ${allowWeightDiscount ? `
+          <div class="form-group" style="margin-top:10px;">
+            <label>📉 خصم على الميزان % <span style="font-weight:400; color:var(--gray-500);">(اختياري)</span></label>
+            <input type="number" step="0.01" min="0" max="100" placeholder="مثل: 3 يعني خصم 3%"
+                   value="${item.weight_discount_pct || ''}"
+                   oninput="${moduleName}.updateItem(${idx}, 'weight_discount_pct', this.value)">
+            <small class="hint">نسبة تُخصم من صافي الميزان (فقد/شوائب) — سيبها فاضية لو مفيش خصم</small>
+          </div>
+        ` : ''}
       </div>
     `;
   },
@@ -425,11 +492,24 @@ const ItemHelper = {
       snap.net_weight = snap.qty;
     }
 
+    // ✅ خصم نسبة الميزان (يُحفظ فقط لو كان مستخدم فعلاً - وإلا يفضل الـ snapshot زي القديم تماماً)
+    const weightDiscountPct = Number(item.weight_discount_pct) || 0;
+    if (weightDiscountPct > 0) {
+      snap.weight_discount_pct = weightDiscountPct;
+      snap.qty_before_weight_discount = item.qty_before_weight_discount || item.qty;
+    }
+
     return snap;
   },
 
   // عرض تفاصيل item في الفاتورة المطبوعة
   renderItemDetail(item) {
+    // ✅ خصم نسبة الميزان (لو موجود فقط - مش موجود إلا في المشتريات وبس لو استُخدم فعلاً)
+    const hasWeightDiscount = (item.weight_discount_pct || 0) > 0 && item.qty_before_weight_discount;
+    const discountNote = hasWeightDiscount
+      ? ` <span style="color:#DC2626;">− خصم ${item.weight_discount_pct}%</span> = <strong>${fmtMoney(item.qty)} كجم</strong>`
+      : '';
+
     if (item.unit_type === 'cartons') {
       // ✅ اسم الوعاء الصحيح حسب وحدة الصنف
       const productUnit = item.product_id ? getProductUnitName(item.product_id) : 'كرتونة';
@@ -448,8 +528,17 @@ const ItemHelper = {
       if (isBala) {
         return `📦 <strong>${item.cartons_count || 0} ${vesselName}</strong>`;
       }
+      if (hasWeightDiscount) {
+        return `📦 ${item.cartons_count || 0} ${vesselName} × ${item.carton_weight || 10} كجم = ${fmtMoney(item.qty_before_weight_discount)} كجم${discountNote}`;
+      }
       return `📦 ${item.cartons_count || 0} ${vesselName} × ${item.carton_weight || 10} كجم = ${fmtMoney(item.qty)} كجم`;
     } else {
+      if (hasWeightDiscount) {
+        return `
+          ⚖️ ${item.car_number ? 'سيارة: ' + item.car_number + ' — ' : ''}
+          إجمالي: ${fmtMoney(item.total_weight)} - فارغ: ${fmtMoney(item.empty_weight)} = ${fmtMoney(item.qty_before_weight_discount)} كجم${discountNote}
+        `;
+      }
       return `
         ⚖️ ${item.car_number ? 'سيارة: ' + item.car_number + ' — ' : ''}
         إجمالي: ${fmtMoney(item.total_weight)} - فارغ: ${fmtMoney(item.empty_weight)} = <strong>${fmtMoney(item.qty)} كجم</strong>
