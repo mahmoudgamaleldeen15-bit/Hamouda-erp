@@ -247,6 +247,11 @@ function doLogout() {
   document.getElementById('login_password').value = '';
   showScreen('loginScreen');
   showNotif('👋 تم تسجيل الخروج', 'info');
+
+  // ✅ إعادة إخفاء زر الطوارئ (لو كان ظاهر) عشان يفضل الوضع الافتراضي مخفي دايماً
+  const box = document.getElementById('emergencyResetBox');
+  if (box) box.style.display = 'none';
+  _footerTapCount = 0;
 }
 
 // ==========================================================
@@ -302,9 +307,92 @@ function logActivity(action, module, entityId, label, extra = {}) {
 }
 
 // ==========================================================
+// 🔒 نظام إظهار زر الطوارئ (7 ضغطات على رقم الإصدار)
+// ==========================================================
+// ✅ الكود الإداري نفسه مش موجود هنا خالص - بس بصمته (Hash) للمقارنة
+// البصمة الأساسية بتتخزن على Firebase وقت أول تشغيل، والقيمة هنا
+// احتياطية بس (Fallback) لو حصل ولم يقدر النظام يوصل للسحابة
+const ADMIN_RESET_SALT = 'HAMOUDA_ADMIN_RESET_SALT_2026_QZ7';
+const ADMIN_RESET_HASH_FALLBACK = 'ar_e7d523f81d69a';
+
+function hashAdminCode(code) {
+  const s = ADMIN_RESET_SALT + '_' + String(code);
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0, ch; i < s.length; i++) {
+    ch = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 'ar_' + (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+}
+
+// ✅ يزرع بصمة الكود في Firebase مرة واحدة بس (لو مش موجودة أصلاً)
+// بيتنفذ تلقائياً وقت تشغيل النظام - بدون أي تدخل يدوي
+async function seedAdminResetHashIfNeeded() {
+  if (typeof CloudSync === 'undefined' || !CloudSync.isInitialized || !CloudSync.isOnline || !CloudSync.db) return;
+  try {
+    const snap = await CloudSync.db.ref('_admin_reset_hash').once('value');
+    if (!snap.exists()) {
+      await CloudSync.db.ref('_admin_reset_hash').set(ADMIN_RESET_HASH_FALLBACK);
+      console.log('✅ Admin reset hash seeded to cloud');
+    }
+  } catch(e) {
+    console.warn('Seed admin reset hash failed:', e);
+  }
+}
+
+let _footerTapCount = 0;
+let _footerTapTimer = null;
+
+function handleFooterTap() {
+  _footerTapCount++;
+
+  // لو المستخدم بطّأ (أكتر من 2.5 ثانية بين ضغطتين) → نصفر العداد
+  if (_footerTapTimer) clearTimeout(_footerTapTimer);
+  _footerTapTimer = setTimeout(() => {
+    _footerTapCount = 0;
+  }, 2500);
+
+  if (_footerTapCount >= 7) {
+    _footerTapCount = 0;
+    if (_footerTapTimer) clearTimeout(_footerTapTimer);
+    const box = document.getElementById('emergencyResetBox');
+    if (box) {
+      box.style.display = 'block';
+      showNotif('🔓 ظهر خيار الطوارئ', 'info', 2000);
+    }
+  }
+}
+
+// ==========================================================
 // 🆘 Emergency Reset - لو الحاج نسي كلمة السر (أدمن واحد بس)
 // ==========================================================
-function emergencyResetSingleAdmin() {
+async function emergencyResetSingleAdmin() {
+  // ✅ الخطوة الأولى: كود إداري سري - أي حد مش عارفه ما يقدرش يكمل
+  const enteredCode = prompt('🔒 هذا إجراء إداري حساس.\n\nمن فضلك أدخل الكود الإداري السري:');
+  if (enteredCode === null) return; // ضغط إلغاء
+
+  // ✅ نجيب البصمة الصحيحة من السحابة (المصدر الأساسي)
+  // ولو النت مقطوع أو Firebase مش جاهزة، نستخدم البصمة الاحتياطية المحلية
+  let correctHash = ADMIN_RESET_HASH_FALLBACK;
+  if (typeof CloudSync !== 'undefined' && CloudSync.isInitialized && CloudSync.isOnline && CloudSync.db) {
+    try {
+      const snap = await CloudSync.db.ref('_admin_reset_hash').once('value');
+      if (snap.exists() && snap.val()) correctHash = snap.val();
+    } catch(e) {
+      console.warn('Fetch admin reset hash failed, using fallback:', e);
+    }
+  }
+
+  if (hashAdminCode(enteredCode) !== correctHash) {
+    alert('❌ الكود غير صحيح');
+    return;
+  }
+
   const users = LocalStore.get('users') || {};
   const userList = Object.values(users).filter(u => u.active !== false);
 

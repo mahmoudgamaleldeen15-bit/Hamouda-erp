@@ -103,8 +103,8 @@
           🔐 دخول
         </button>
 
-        <!-- ✅ زر طوارئ - نسيت الباس -->
-        <div style="margin-top:16px; text-align:center;">
+        <!-- ✅ زر طوارئ - مخفي افتراضياً، يظهر بعد 7 ضغطات على "Hamouda ERP v1.0" تحت -->
+        <div id="emergencyResetBox" style="margin-top:16px; text-align:center; display:none;">
           <button type="button" onclick="emergencyResetSingleAdmin()"
                   style="background:none; border:none; color:var(--gray-500); font-size:12px; cursor:pointer; text-decoration:underline;">
             🔐 نسيت اسم المستخدم أو كلمة السر؟
@@ -116,7 +116,7 @@
       </div>
 
       <div class="auth-footer">
-        <small>Hamouda ERP v1.0 — MG AppHouse</small>
+        <small id="footerVersionTap" onclick="handleFooterTap()" style="cursor:default; user-select:none;">Hamouda ERP v1.0 — MG AppHouse</small>
       </div>
     </div>
   </div>

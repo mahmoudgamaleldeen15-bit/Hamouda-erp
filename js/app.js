@@ -258,7 +258,12 @@ window.addEventListener('load', () => {
   // ☁️ Initialize Cloud Sync early
   setTimeout(() => {
     if (typeof CloudSync !== 'undefined') {
-      CloudSync.init().catch(e => console.warn('Cloud init warning:', e));
+      CloudSync.init().then(() => {
+        // ✅ زرع بصمة الكود الإداري في السحابة (مرة واحدة بس، لو مش موجودة أصلاً)
+        if (typeof seedAdminResetHashIfNeeded === 'function') {
+          seedAdminResetHashIfNeeded();
+        }
+      }).catch(e => console.warn('Cloud init warning:', e));
     }
   }, 500);
 
