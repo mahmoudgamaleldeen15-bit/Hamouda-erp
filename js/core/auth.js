@@ -49,6 +49,35 @@ function doFirstRunSetup() {
   };
   LocalStore.set('users', users);
 
+  // ✅ فحص حرج: هل فيه بيانات موجودة بالفعل (مخازن/فواتير/أصناف)؟
+  // لو أيوه، يبقى ده مش "أول تشغيل" حقيقي - ده إعادة إنشاء حساب بعد نسيان الباسورد
+  // وفي الحالة دي، لازم نوقف هنا ومنلمسش أي حاجة تانية خالص (إعدادات/مخازن/عدادات)
+  const existingWarehouses = LocalStore.get('warehouses');
+  const existingProducts = LocalStore.get('products');
+  const existingSalesInv = LocalStore.get('sales_invoices');
+  const existingPurchaseInv = LocalStore.get('purchase_invoices');
+  const hasExistingData = (
+    (existingWarehouses && Object.keys(existingWarehouses).length > 0) ||
+    (existingProducts && Object.keys(existingProducts).length > 0) ||
+    (existingSalesInv && Object.keys(existingSalesInv).length > 0) ||
+    (existingPurchaseInv && Object.keys(existingPurchaseInv).length > 0)
+  );
+
+  if (hasExistingData) {
+    // ✅ فيه بيانات موجودة - وقفنا هنا، اليوزر بس هو اللي اتعمل، وكل حاجة تانية فضلت زي ما هي
+    console.log('✅ Existing data detected - only created admin user, kept everything else untouched');
+    showNotif('✅ تم إنشاء الحساب - كل البيانات القديمة موجودة زي ما هي', 'success');
+
+    setTimeout(() => {
+      document.getElementById('login_username').value = username;
+      showScreen('loginScreen');
+      document.getElementById('login_password').focus();
+    }, 800);
+    return;
+  }
+
+  // ⬇️ من هنا الكود بيتنفذ بس لو النظام فاضي بالكامل (أول تشغيل حقيقي)
+
   // إنشاء إعدادات الشركة الافتراضية
   LocalStore.set('settings/company', DEFAULT_COMPANY);
   LocalStore.set('settings/payment_methods', DEFAULT_PAYMENT_METHODS);
@@ -421,8 +450,22 @@ async function emergencyResetSingleAdmin() {
     return;
   }
 
-  // امسح الـ users بس (الباقي يفضل)
+  // امسح الـ users محلياً
   LocalStore.set('users', {});
+
+  // ✅ إصلاح حرج: object فاضي مش بيترفع تلقائياً للسحابة (قاعدة في نظام الرفع)
+  // فلازم نمسح من Firebase صراحة، وإلا هيرجع اليوزر القديم بعد الـ reload
+  if (typeof CloudSync !== 'undefined' && CloudSync.isInitialized && CloudSync.isOnline && CloudSync.db) {
+    try {
+      await CloudSync.db.ref('users').set(null);
+      console.log('✅ Users cleared from cloud');
+    } catch(e) {
+      console.warn('Failed to clear users from cloud:', e);
+      alert('⚠️ تم المسح محلياً، لكن حصلت مشكلة في مسح النسخة على السحابة.\n\nتأكد إن عندك نت شغال وحاول تاني، وإلا ممكن يرجع اليوزر القديم.');
+    }
+  } else {
+    alert('⚠️ مفيش اتصال بالسحابة دلوقتي.\n\nالمسح هيتم محلياً بس، وممكن اليوزر القديم يرجع لو النظام اتصل بالسحابة بعدين ولقاه لسه موجود هناك.\n\nيفضل تتأكد إن عندك نت شغال قبل ما تعمل الخطوة دي.');
+  }
 
   // كمان امسح الـ current session
   sessionStorage.clear();
